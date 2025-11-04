@@ -1,65 +1,87 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, BarChart3, Contact, Sparkles } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+const benefits = [
+  {
+    title: "Unified customer records",
+    description: "Centralize notes, emails, and deal history so your team is always aligned.",
+    icon: Contact,
+  },
+  {
+    title: "Automated workflows",
+    description: "Trigger follow-ups and reminders the moment pipeline milestones change.",
+    icon: Sparkles,
+  },
+  {
+    title: "Real-time insights",
+    description: "Forecast revenue with confidence using visual dashboards and health scores.",
+    icon: BarChart3,
+  },
+];
 
 export default function Home() {
+  const currentYear = new Date().getFullYear();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-background via-background to-muted/40">
+      <main className="flex flex-1 flex-col items-center px-6 pb-24 pt-24 sm:px-10 lg:px-16">
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-4 py-1 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">
+            Trusted CRM for high-performing teams
+          </span>
+          <h1 className="mt-8 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+            Build momentum with every customer conversation.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
+            CRM Ganamos gives sales and success teams a shared workspace to organize deals, automate follow-ups, and deliver winning experiences.
           </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Button asChild size="lg" className="px-8">
+              <Link href="/register">
+                Start free trial
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="px-8">
+              <Link href="/login">Sign in</Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="mt-20 grid w-full max-w-5xl gap-6 md:grid-cols-3">
+          {benefits.map((benefit) => (
+            <Card key={benefit.title} className="border-border/80 bg-background/80 backdrop-blur">
+              <CardContent className="space-y-4 p-6">
+                <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <benefit.icon className="size-5" />
+                </div>
+                <div className="space-y-2 text-left">
+                  <h2 className="text-lg font-semibold text-foreground">{benefit.title}</h2>
+                  <p className="text-sm text-muted-foreground">{benefit.description}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </main>
+      <footer className="border-t border-border/70 bg-background/80 py-8">
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
+          <p>© {currentYear} CRM Ganamos. All rights reserved.</p>
+          <div className="flex gap-6">
+            <Link href="/login" className="transition hover:text-foreground">
+              Login
+            </Link>
+            <Link href="/register" className="transition hover:text-foreground">
+              Register
+            </Link>
+            <Link href="#" className="transition hover:text-foreground">
+              Privacy
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
