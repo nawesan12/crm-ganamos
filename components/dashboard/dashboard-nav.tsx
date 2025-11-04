@@ -12,13 +12,13 @@ import { cn } from "@/lib/utils";
 const navItems = [
   {
     href: "/admin",
-    label: "Admin overview",
-    description: "KPIs, onboarding and client health",
+    label: "Resumen de administrador",
+    description: "KPIs, incorporación y salud del cliente",
   },
   {
     href: "/cashier",
-    label: "Cashier console",
-    description: "Log daily coin charges",
+    label: "Consola de cajero",
+    description: "Registrar cargos diarios de monedas",
   },
 ];
 
@@ -75,7 +75,7 @@ export function DashboardNav() {
           </span>
           <div className="flex flex-col leading-tight">
             <span>CRM Ganamos</span>
-            <span className="text-xs text-muted-foreground">Operations dashboards</span>
+            <span className="text-xs text-muted-foreground">Paneles de operaciones</span>
           </div>
         </Link>
 
@@ -88,7 +88,7 @@ export function DashboardNav() {
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
                 <Menu className="size-5" />
-                <span className="sr-only">Open navigation</span>
+                <span className="sr-only">Abrir navegación</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-72">

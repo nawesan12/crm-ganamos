@@ -25,11 +25,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-type TeamMemberStatus = "On track" | "At risk" | "New hire";
+type TeamMemberStatus = "En curso" | "En riesgo" | "Nuevo ingreso";
 
-type ClientLifecycleStage = "Onboarding" | "Nurturing" | "Expansion";
+type ClientLifecycleStage = "Incorporación" | "Nutrición" | "Expansión";
 
-type ClientHealthStatus = "Healthy" | "Needs attention" | "At risk";
+type ClientHealthStatus = "Saludable" | "Necesita atención" | "En riesgo";
 
 type TeamMember = {
   id: string;
@@ -59,8 +59,8 @@ const initialTeamMembers: TeamMember[] = [
     id: "tm-1",
     name: "Laura Sánchez",
     email: "laura.sanchez@ganamos.mx",
-    role: "Account Executive",
-    status: "On track",
+    role: "Ejecutivo de cuenta",
+    status: "En curso",
     activeDeals: 6,
     lastActive: "2024-08-21",
   },
@@ -68,8 +68,8 @@ const initialTeamMembers: TeamMember[] = [
     id: "tm-2",
     name: "Héctor Flores",
     email: "hector.flores@ganamos.mx",
-    role: "Customer Success",
-    status: "At risk",
+    role: "Éxito del cliente",
+    status: "En riesgo",
     activeDeals: 3,
     lastActive: "2024-08-18",
   },
@@ -77,8 +77,8 @@ const initialTeamMembers: TeamMember[] = [
     id: "tm-3",
     name: "Rocío Andrade",
     email: "rocio.andrade@ganamos.mx",
-    role: "Implementation Lead",
-    status: "On track",
+    role: "Líder de implementación",
+    status: "En curso",
     activeDeals: 4,
     lastActive: "2024-08-20",
   },
@@ -90,36 +90,36 @@ const initialClients: ClientAccount[] = [
     company: "Soluciones Rivera",
     poc: "Daniel Rivera",
     email: "daniel@solucionesrivera.mx",
-    stage: "Onboarding",
+    stage: "Incorporación",
     monthlyValue: 4200,
-    health: "Healthy",
+    health: "Saludable",
     lastInteraction: "2024-08-19",
     onboardingDays: 9,
-    notes: "Waiting for billing integration",
+    notes: "Esperando integración de facturación",
   },
   {
     id: "cl-2",
     company: "Grupo Atalaya",
     poc: "María José Torres",
     email: "maria.torres@grupotalaya.mx",
-    stage: "Expansion",
+    stage: "Expansión",
     monthlyValue: 6800,
-    health: "Healthy",
+    health: "Saludable",
     lastInteraction: "2024-08-17",
     onboardingDays: 15,
-    notes: "Interested in analytics add-on",
+    notes: "Interesado en el complemento de análisis",
   },
   {
     id: "cl-3",
     company: "Mercado Verde",
     poc: "Luis Rivas",
     email: "luis.rivas@mercadoverde.mx",
-    stage: "Nurturing",
+    stage: "Nutrición",
     monthlyValue: 2900,
-    health: "Needs attention",
+    health: "Necesita atención",
     lastInteraction: "2024-08-15",
     onboardingDays: 21,
-    notes: "Delays signing data processing agreement",
+    notes: "Retrasos en la firma del acuerdo de procesamiento de datos",
   },
 ];
 
@@ -148,7 +148,7 @@ export default function AdminDashboardPage() {
     name: "",
     email: "",
     role: "",
-    status: "On track",
+    status: "En curso",
   });
   const [clientForm, setClientForm] = useState<{
     company: string;
@@ -162,7 +162,7 @@ export default function AdminDashboardPage() {
     company: "",
     poc: "",
     email: "",
-    stage: "Onboarding",
+    stage: "Incorporación",
     monthlyValue: "",
     onboardingDays: "14",
     notes: "",
@@ -173,7 +173,7 @@ export default function AdminDashboardPage() {
   const onboardingQueue = useMemo(
     () =>
       clients
-        .filter((client) => client.stage === "Onboarding")
+        .filter((client) => client.stage === "Incorporación")
         .sort((a, b) => b.monthlyValue - a.monthlyValue),
     [clients],
   );
@@ -184,10 +184,10 @@ export default function AdminDashboardPage() {
       0,
     );
     const onboardingCount = clients.filter(
-      (client) => client.stage === "Onboarding",
+      (client) => client.stage === "Incorporación",
     ).length;
     const healthyRatio = Math.round(
-      (clients.filter((client) => client.health === "Healthy").length /
+      (clients.filter((client) => client.health === "Saludable").length /
         Math.max(clients.length, 1)) *
         100,
     );
@@ -207,7 +207,7 @@ export default function AdminDashboardPage() {
   const handleAddUser = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!userForm.name || !userForm.email || !userForm.role) {
-      setUserMessage("Complete every required field before creating the profile.");
+      setUserMessage("Complete todos los campos obligatorios antes de crear el perfil.");
       return;
     }
 
@@ -222,14 +222,14 @@ export default function AdminDashboardPage() {
     };
 
     setTeamMembers((prev) => [newUser, ...prev]);
-    setUserForm({ name: "", email: "", role: "", status: "On track" });
-    setUserMessage(`${newUser.name} was added to the workspace.`);
+    setUserForm({ name: "", email: "", role: "", status: "En curso" });
+    setUserMessage(`${newUser.name} se agregó al espacio de trabajo.`);
   };
 
   const handleAddClient = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!clientForm.company || !clientForm.poc || !clientForm.email) {
-      setClientMessage("All contact fields are required to create a client record.");
+      setClientMessage("Todos los campos de contacto son obligatorios para crear un registro de cliente.");
       return;
     }
 
@@ -256,13 +256,13 @@ export default function AdminDashboardPage() {
       company: "",
       poc: "",
       email: "",
-      stage: "Onboarding",
+      stage: "Incorporación",
       monthlyValue: "",
       onboardingDays: "14",
       notes: "",
     });
     setClientMessage(
-      `${newClient.company} is now part of the onboarding pipeline.`,
+      `${newClient.company} ahora forma parte del pipeline de incorporación.`,
     );
   };
 
@@ -270,53 +270,51 @@ export default function AdminDashboardPage() {
     <div className="space-y-10">
       <div className="flex flex-col gap-3">
         <span className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
-          Admin control room
+          Sala de control de administración
         </span>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          Revenue operations, at a glance
+          Operaciones de ingresos, de un vistazo
         </h1>
         <p className="max-w-3xl text-muted-foreground">
-          Stay ahead of onboarding, team performance, and client health. Use the
-          forms below to onboard teammates and new accounts without leaving the
-          analytics view.
+          Manténgase a la vanguardia de la incorporación, el rendimiento del equipo y la salud del cliente. Utilice los formularios a continuación para incorporar compañeros de equipo y nuevas cuentas sin salir de la vista de análisis.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          title="Monthly recurring revenue"
+          title="Ingresos recurrentes mensuales"
           value={currency.format(metrics.totalMonthlyValue)}
           icon={<CircleDollarSign className="size-5" />}
-          trendLabel="Rolling 30 days"
-          trendValue="▲ 12% vs last cycle"
+          trendLabel="Últimos 30 días"
+          trendValue="▲ 12% vs ciclo anterior"
           trendDirection="up"
-          description="Sum of all active subscription contracts"
+          description="Suma de todos los contratos de suscripción activos"
         />
         <MetricCard
-          title="Active onboardings"
+          title="Incorporaciones activas"
           value={`${metrics.onboardingCount}`}
           icon={<CalendarPlus className="size-5" />}
-          trendLabel="Teams to launch"
-          trendValue="3 kickoffs scheduled"
-          description="Clients in onboarding stage"
+          trendLabel="Equipos por lanzar"
+          trendValue="3 inicios programados"
+          description="Clientes en etapa de incorporación"
         />
         <MetricCard
-          title="Healthy accounts"
+          title="Cuentas saludables"
           value={`${metrics.healthyRatio}%`}
           icon={<BadgeCheck className="size-5" />}
-          trendLabel="Customer health"
-          trendValue="86% target"
+          trendLabel="Salud del cliente"
+          trendValue="Objetivo del 86%"
           trendDirection={metrics.healthyRatio >= 86 ? "up" : "down"}
-          description="Accounts marked green during the last review"
+          description="Cuentas marcadas en verde durante la última revisión"
         />
         <MetricCard
-          title="Average go-live time"
-          value={`${metrics.avgOnboardingTime} days`}
+          title="Tiempo promedio de puesta en marcha"
+          value={`${metrics.avgOnboardingTime} días`}
           icon={<Clock3 className="size-5" />}
-          trendLabel="From signature to activation"
-          trendValue="Goal: < 14 days"
+          trendLabel="Desde la firma hasta la activación"
+          trendValue="Objetivo: < 14 días"
           trendDirection={metrics.avgOnboardingTime <= 14 ? "up" : "down"}
-          description="Track implementation efficiency across accounts"
+          description="Seguimiento de la eficiencia de la implementación en todas las cuentas"
         />
       </div>
 
@@ -324,17 +322,16 @@ export default function AdminDashboardPage() {
         <Card className="border-border/70 bg-background/90">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-foreground">
-              Team onboarding queue
+              Cola de incorporación del equipo
             </CardTitle>
             <CardDescription>
-              Highest value accounts at the top to focus implementation resources.
+              Cuentas de mayor valor en la parte superior para enfocar los recursos de implementación.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {onboardingQueue.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                No onboarding accounts at the moment. Add a new client to get
-                started.
+                No hay cuentas en proceso de incorporación en este momento. Agregue un nuevo cliente para comenzar.
               </div>
             ) : (
               onboardingQueue.map((client) => (
@@ -361,14 +358,14 @@ export default function AdminDashboardPage() {
                         {currency.format(client.monthlyValue)}
                       </span>
                       <span className="text-muted-foreground">
-                        Value potential
+                        Valor potencial
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="font-medium text-foreground">
-                        {client.onboardingDays} days
+                        {client.onboardingDays} días
                       </span>
-                      <span className="text-muted-foreground">In onboarding</span>
+                      <span className="text-muted-foreground">En incorporación</span>
                     </div>
                   </div>
                 </div>
@@ -380,10 +377,10 @@ export default function AdminDashboardPage() {
         <Card className="border-border/70 bg-background/90">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-foreground">
-              Weekly highlights
+              Destacados semanales
             </CardTitle>
             <CardDescription>
-              Quick wins and risks to share with leadership.
+              Victorias rápidas y riesgos para compartir con el liderazgo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -391,11 +388,10 @@ export default function AdminDashboardPage() {
               <TrendingUp className="mt-0.5 size-5 text-primary" />
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">
-                  Expansion opportunity with Grupo Atalaya
+                  Oportunidad de expansión con Grupo Atalaya
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  They requested pricing for analytics seats. Prepare proposal
-                  before Thursday&rsquo;s QBR.
+                  Solicitaron precios para puestos de análisis. Preparar propuesta antes del QBR del jueves.
                 </p>
               </div>
             </div>
@@ -403,11 +399,10 @@ export default function AdminDashboardPage() {
               <Target className="mt-0.5 size-5 text-amber-600" />
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">
-                  Mercado Verde requires an executive touchpoint
+                  Mercado Verde requiere un punto de contacto ejecutivo
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Implementation blocked by legal review. Schedule leadership
-                  call to unblock contract.
+                  Implementación bloqueada por revisión legal. Programar llamada de liderazgo para desbloquear el contrato.
                 </p>
               </div>
             </div>
@@ -415,11 +410,10 @@ export default function AdminDashboardPage() {
               <Activity className="mt-0.5 size-5 text-emerald-600" />
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">
-                  New health survey launched
+                  Nueva encuesta de salud lanzada
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Send pulse survey to top 20 accounts and review insights on
-                  Monday&rsquo;s sync.
+                  Enviar encuesta de pulso a las 20 cuentas principales y revisar los conocimientos en la sincronización del lunes.
                 </p>
               </div>
             </div>
@@ -431,10 +425,10 @@ export default function AdminDashboardPage() {
         <Card className="border-border/70 bg-background/90">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-foreground">
-              Add a teammate
+              Agregar un compañero de equipo
             </CardTitle>
             <CardDescription>
-              Provision access for sales, success, or implementation specialists.
+              Proporcione acceso a especialistas en ventas, éxito o implementación.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -442,11 +436,11 @@ export default function AdminDashboardPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="name">
-                    Full name
+                    Nombre completo
                   </label>
                   <Input
                     id="name"
-                    placeholder="e.g. Fernanda Ruiz"
+                    placeholder="p.ej. Fernanda Ruiz"
                     value={userForm.name}
                     onChange={(event) =>
                       setUserForm((prev) => ({
@@ -459,7 +453,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="email">
-                    Work email
+                    Correo electrónico de trabajo
                   </label>
                   <Input
                     id="email"
@@ -477,11 +471,11 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="role">
-                    Role
+                    Rol
                   </label>
                   <Input
                     id="role"
-                    placeholder="Customer Success"
+                    placeholder="Éxito del cliente"
                     value={userForm.role}
                     onChange={(event) =>
                       setUserForm((prev) => ({
@@ -494,7 +488,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="status">
-                    Ramp status
+                    Estado de preparación
                   </label>
                   <select
                     id="status"
@@ -503,13 +497,13 @@ export default function AdminDashboardPage() {
                     onChange={(event) =>
                       setUserForm((prev) => ({
                         ...prev,
-                        status: event.target.value,
+                        status: event.target.value as TeamMemberStatus,
                       }))
                     }
                   >
-                    <option value="On track">On track</option>
-                    <option value="At risk">At risk</option>
-                    <option value="New hire">New hire</option>
+                    <option value="En curso">En curso</option>
+                    <option value="En riesgo">En riesgo</option>
+                    <option value="Nuevo ingreso">Nuevo ingreso</option>
                   </select>
                 </div>
               </div>
@@ -527,15 +521,15 @@ export default function AdminDashboardPage() {
                       name: "",
                       email: "",
                       role: "",
-                      status: "On track",
+                      status: "En curso",
                     });
                     setUserMessage(null);
                   }}
                 >
-                  Clear
+                  Limpiar
                 </Button>
                 <Button type="submit" className="px-6">
-                  Invite teammate
+                  Invitar a compañero de equipo
                 </Button>
               </div>
             </form>
@@ -545,10 +539,10 @@ export default function AdminDashboardPage() {
         <Card className="border-border/70 bg-background/90">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-foreground">
-              Add a client account
+              Agregar una cuenta de cliente
             </CardTitle>
             <CardDescription>
-              Capture go-live context so the success team can follow through.
+              Capture el contexto de la puesta en marcha para que el equipo de éxito pueda dar seguimiento.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -556,7 +550,7 @@ export default function AdminDashboardPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="company">
-                    Company name
+                    Nombre de la empresa
                   </label>
                   <Input
                     id="company"
@@ -573,11 +567,11 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="poc">
-                    Point of contact
+                    Punto de contacto
                   </label>
                   <Input
                     id="poc"
-                    placeholder="Name and last name"
+                    placeholder="Nombre y apellido"
                     value={clientForm.poc}
                     onChange={(event) =>
                       setClientForm((prev) => ({
@@ -590,7 +584,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="clientEmail">
-                    Contact email
+                    Correo electrónico de contacto
                   </label>
                   <Input
                     id="clientEmail"
@@ -608,7 +602,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="stage">
-                    Lifecycle stage
+                    Etapa del ciclo de vida
                   </label>
                   <select
                     id="stage"
@@ -617,18 +611,18 @@ export default function AdminDashboardPage() {
                     onChange={(event) =>
                       setClientForm((prev) => ({
                         ...prev,
-                        stage: event.target.value,
+                        stage: event.target.value as ClientLifecycleStage,
                       }))
                     }
                   >
-                    <option value="Onboarding">Onboarding</option>
-                    <option value="Nurturing">Nurturing</option>
-                    <option value="Expansion">Expansion</option>
+                    <option value="Incorporación">Incorporación</option>
+                    <option value="Nutrición">Nutrición</option>
+                    <option value="Expansión">Expansión</option>
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="monthlyValue">
-                    Monthly value (USD)
+                    Valor mensual (USD)
                   </label>
                   <Input
                     id="monthlyValue"
@@ -645,7 +639,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="onboardingDays">
-                    Days in onboarding
+                    Días en incorporación
                   </label>
                   <Input
                     id="onboardingDays"
@@ -663,11 +657,11 @@ export default function AdminDashboardPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground" htmlFor="notes">
-                  Notes for the team
+                  Notas para el equipo
                 </label>
                 <Textarea
                   id="notes"
-                  placeholder="Context, blockers, or next steps"
+                  placeholder="Contexto, bloqueadores o próximos pasos"
                   value={clientForm.notes}
                   onChange={(event) =>
                     setClientForm((prev) => ({
@@ -692,7 +686,7 @@ export default function AdminDashboardPage() {
                       company: "",
                       poc: "",
                       email: "",
-                      stage: "Onboarding",
+                      stage: "Incorporación",
                       monthlyValue: "",
                       onboardingDays: "14",
                       notes: "",
@@ -700,10 +694,10 @@ export default function AdminDashboardPage() {
                     setClientMessage(null);
                   }}
                 >
-                  Clear
+                  Limpiar
                 </Button>
                 <Button type="submit" className="px-6">
-                  Create client
+                  Crear cliente
                 </Button>
               </div>
             </form>
@@ -715,22 +709,22 @@ export default function AdminDashboardPage() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-xl font-semibold text-foreground">
-              Team performance snapshot
+              Resumen de rendimiento del equipo
             </CardTitle>
             <CardDescription>
-              Monitor deal load and engagement activity per teammate.
+              Supervise la carga de acuerdos y la actividad de participación por compañero de equipo.
             </CardDescription>
           </div>
           <Button variant="outline" className="px-4">
-            Export CSV
+            Exportar CSV
           </Button>
         </CardHeader>
         <CardContent className="overflow-hidden rounded-xl border border-border/60">
           <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_1fr] bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground sm:grid">
-            <span>Teammate</span>
-            <span>Role</span>
-            <span>Last active</span>
-            <span className="text-right">Active deals</span>
+            <span>Compañero de equipo</span>
+            <span>Rol</span>
+            <span>Última vez activo</span>
+            <span className="text-right">Acuerdos activos</span>
           </div>
           <div className="divide-y divide-border/60">
             {teamMembers.map((member) => (
@@ -756,14 +750,14 @@ export default function AdminDashboardPage() {
         <CardFooter className="justify-between text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Users className="size-4" />
-            {teamMembers.length} teammates onboarded
+            {teamMembers.length} compañeros de equipo incorporados
           </div>
           <div className="flex items-center gap-2">
             <CircleDollarSign className="size-4" />
             {currency.format(
               clients.reduce((acc, client) => acc + client.monthlyValue, 0),
             )}{" "}
-            in managed revenue
+            en ingresos gestionados
           </div>
         </CardFooter>
       </Card>

@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-type MembershipTier = "Premium" | "Standard" | "Enterprise";
+type MembershipTier = "Premium" | "Estándar" | "Empresarial";
 
 type LedgerMember = {
   id: string;
@@ -54,25 +54,25 @@ const initialLedger: LedgerMember[] = [
     coinsThisMonth: 340,
     visitWindow: "09:00 - 10:30",
     lastCharge: "2024-08-20",
-    preferences: "Send invoice by email",
+    preferences: "Enviar factura por correo electrónico",
   },
   {
     id: "m-2",
     name: "Lucía Herrera",
-    membership: "Standard",
+    membership: "Estándar",
     coinsThisMonth: 180,
     visitWindow: "11:00 - 12:30",
     lastCharge: "2024-08-21",
-    preferences: "Prefers cash receipt",
+    preferences: "Prefiere recibo en efectivo",
   },
   {
     id: "m-3",
     name: "Andrés Quiroz",
-    membership: "Enterprise",
+    membership: "Empresarial",
     coinsThisMonth: 520,
     visitWindow: "14:00 - 15:30",
     lastCharge: "2024-08-19",
-    preferences: "Validate ID before delivering coins",
+    preferences: "Validar identificación antes de entregar monedas",
   },
   {
     id: "m-4",
@@ -91,7 +91,7 @@ const initialChargeLog: ChargeLogEntry[] = [
     userName: "Julieta Ramos",
     coins: 150,
     timestamp: "2024-08-21T10:45:00.000Z",
-    note: "Pre-loaded from morning shift",
+    note: "Precargado del turno de la mañana",
   },
   {
     id: "log-2",
@@ -125,7 +125,7 @@ export default function CashierDashboardPage() {
   const [tierFilter, setTierFilter] = useState<"all" | MembershipTier>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [notes, setNotes] = useState(
-    "Confirm cash drawer at close and sync totals with finance before 7 PM.",
+    "Confirmar el cajón de efectivo al cierre y sincronizar los totales con finanzas antes de las 7 PM.",
   );
   const [notesMessage, setNotesMessage] = useState<string | null>(null);
 
@@ -187,7 +187,7 @@ export default function CashierDashboardPage() {
     if (!Number.isFinite(coins) || coins <= 0) {
       setRowFeedback((prev) => ({
         ...prev,
-        [memberId]: "Enter a positive amount to log.",
+        [memberId]: "Ingrese un monto positivo para registrar.",
       }));
       return;
     }
@@ -228,78 +228,76 @@ export default function CashierDashboardPage() {
     }));
     setRowFeedback((prev) => ({
       ...prev,
-      [memberId]: `${coinFormatter.format(coins)} coins logged`,
+      [memberId]: `${coinFormatter.format(coins)} monedas registradas`,
     }));
   };
 
   const handleSaveNotes = () => {
-    setNotesMessage("Shift notes saved for the team.");
+    setNotesMessage("Notas de turno guardadas para el equipo.");
   };
 
   return (
     <div className="space-y-10">
       <div className="flex flex-col gap-3">
         <span className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
-          Cashier operations
+          Operaciones de cajero
         </span>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          Seamless daily coin reconciliation
+          Conciliación diaria de monedas sin problemas
         </h1>
         <p className="max-w-3xl text-muted-foreground">
-          Log each customer visit, track coins delivered, and keep an instant
-          record for finance. Filters and quick notes help the next shift know
-          exactly where things stand.
+          Registre cada visita de cliente, realice un seguimiento de las monedas entregadas y mantenga un registro instantáneo para finanzas. Los filtros y las notas rápidas ayudan al próximo turno a saber exactamente cómo están las cosas.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          title="Coins logged today"
+          title="Monedas registradas hoy"
           value={coinFormatter.format(coinsChargedToday)}
           icon={<Coins className="size-5" />}
-          trendLabel="Selected date"
+          trendLabel="Fecha seleccionada"
           trendValue={
             coinsChargedToday > 0
-              ? `▲ ${coinFormatter.format(coinsChargedToday)} coins`
-              : "Awaiting first charge"
+              ? `▲ ${coinFormatter.format(coinsChargedToday)} monedas`
+              : "Esperando el primer cargo"
           }
           trendDirection={coinsChargedToday > 0 ? "up" : "neutral"}
-          description="Sum of charges recorded in the ledger"
+          description="Suma de los cargos registrados en el libro mayor"
         />
         <MetricCard
-          title="Members served"
+          title="Miembros atendidos"
           value={`${customersServedToday}`}
           icon={<UsersRound className="size-5" />}
-          trendLabel="Unique visitors"
+          trendLabel="Visitantes únicos"
           trendValue={
             customersServedToday > 0
-              ? `${customersServedToday} visits completed`
-              : "No visitors yet"
+              ? `${customersServedToday} visitas completadas`
+              : "Aún no hay visitantes"
           }
           trendDirection={customersServedToday > 0 ? "up" : "neutral"}
-          description="Unique members with at least one charge"
+          description="Miembros únicos con al menos un cargo"
         />
         <MetricCard
-          title="Average per charge"
-          value={`${coinFormatter.format(averageCoinsPerCharge)} coins`}
+          title="Promedio por cargo"
+          value={`${coinFormatter.format(averageCoinsPerCharge)} monedas`}
           icon={<Sparkles className="size-5" />}
-          trendLabel="Efficiency"
-          trendValue="Target: 120 coins"
+          trendLabel="Eficiencia"
+          trendValue="Objetivo: 120 monedas"
           trendDirection={averageCoinsPerCharge >= 120 ? "up" : "down"}
-          description="Benchmark daily payouts for staffing"
+          description="Pagos diarios de referencia para la dotación de personal"
         />
         <MetricCard
-          title="Pending visits"
+          title="Visitas pendientes"
           value={`${pendingVisits.length}`}
           icon={<CalendarClock className="size-5" />}
-          trendLabel="Awaiting confirmation"
+          trendLabel="Esperando confirmación"
           trendValue={
             pendingVisits.length > 0
-              ? `${pendingVisits.length} members outstanding`
-              : "All members served"
+              ? `${pendingVisits.length} miembros pendientes`
+              : "Todos los miembros atendidos"
           }
           trendDirection={pendingVisits.length === 0 ? "up" : "neutral"}
-          description="Members not yet charged on the selected day"
+          description="Miembros que aún no han sido cobrados en el día seleccionado"
         />
       </div>
 
@@ -308,16 +306,15 @@ export default function CashierDashboardPage() {
           <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <CardTitle className="text-xl font-semibold text-foreground">
-                Daily charge board
+                Tablero de cargos diarios
               </CardTitle>
               <CardDescription>
-                Capture today’s visits in just a few clicks. Amounts update the
-                ledger instantly.
+                Capture las visitas de hoy con solo unos pocos clics. Los montos actualizan el libro mayor al instante.
               </CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <label className="flex flex-col text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                Work date
+                Fecha de trabajo
                 <Input
                   type="date"
                   value={selectedDate}
@@ -334,7 +331,7 @@ export default function CashierDashboardPage() {
                 <Input
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search member or tier"
+                  placeholder="Buscar miembro o nivel"
                   className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
                 />
               </div>
@@ -347,25 +344,25 @@ export default function CashierDashboardPage() {
                     setTierFilter(event.target.value as typeof tierFilter)
                   }
                 >
-                  <option value="all">All tiers</option>
+                  <option value="all">Todos los niveles</option>
                   <option value="Premium">Premium</option>
-                  <option value="Standard">Standard</option>
-                  <option value="Enterprise">Enterprise</option>
+                  <option value="Estándar">Estándar</option>
+                  <option value="Empresarial">Empresarial</option>
                 </select>
               </div>
             </div>
 
             <div className="overflow-hidden rounded-xl border border-border/60">
               <div className="hidden grid-cols-[2fr_1fr_1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
-                <span>Member</span>
-                <span>Tier</span>
-                <span>Coins this month</span>
-                <span className="text-right">Log charge</span>
+                <span>Miembro</span>
+                <span>Nivel</span>
+                <span>Monedas este mes</span>
+                <span className="text-right">Registrar cargo</span>
               </div>
               <div className="divide-y divide-border/60">
                 {filteredMembers.length === 0 ? (
                   <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    No members match the filters. Adjust the search or tier.
+                    Ningún miembro coincide con los filtros. Ajuste la búsqueda o el nivel.
                   </div>
                 ) : (
                   filteredMembers.map((member) => (
@@ -390,7 +387,7 @@ export default function CashierDashboardPage() {
                         {member.membership}
                       </span>
                       <span className="text-muted-foreground">
-                        {coinFormatter.format(member.coinsThisMonth)} coins
+                        {coinFormatter.format(member.coinsThisMonth)} monedas
                       </span>
                       <div className="flex flex-col gap-2 md:items-end">
                         <div className="flex items-center gap-2">
@@ -420,7 +417,7 @@ export default function CashierDashboardPage() {
                             size="sm"
                             onClick={() => handleChargeSubmit(member.id)}
                           >
-                            Log
+                            Registrar
                           </Button>
                         </div>
                         {rowFeedback[member.id] && (
@@ -441,16 +438,16 @@ export default function CashierDashboardPage() {
           <Card className="border-border/70 bg-background/90">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-foreground">
-                Daily reconciliation log
+                Registro de conciliación diaria
               </CardTitle>
               <CardDescription>
-                All coins recorded for the selected date appear here instantly.
+                Todas las monedas registradas para la fecha seleccionada aparecen aquí al instante.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {chargesForSelectedDate.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-muted-foreground">
-                  No charges have been registered on this date yet.
+                  Aún no se han registrado cargos en esta fecha.
                 </div>
               ) : (
                 chargesForSelectedDate.slice(0, 6).map((entry) => (
@@ -463,7 +460,7 @@ export default function CashierDashboardPage() {
                         {entry.userName}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {coinFormatter.format(entry.coins)} coins • Logged at{" "}
+                        {coinFormatter.format(entry.coins)} monedas • Registrado a las{" "}
                         {new Date(entry.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -483,11 +480,11 @@ export default function CashierDashboardPage() {
             <CardFooter className="justify-between text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Coins className="size-4" />
-                {coinFormatter.format(coinsChargedToday)} coins today
+                {coinFormatter.format(coinsChargedToday)} monedas hoy
               </div>
               <div className="flex items-center gap-2">
                 <ClipboardList className="size-4" />
-                {chargesForSelectedDate.length} total records
+                {chargesForSelectedDate.length} registros totales
               </div>
             </CardFooter>
           </Card>
@@ -495,10 +492,10 @@ export default function CashierDashboardPage() {
           <Card className="border-border/70 bg-background/90">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-foreground">
-                Shift notes
+                Notas de turno
               </CardTitle>
               <CardDescription>
-                Leave guidance for the next cashier or recap incidents.
+                Deje una guía para el próximo cajero o resuma los incidentes.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -518,14 +515,14 @@ export default function CashierDashboardPage() {
                 variant="ghost"
                 onClick={() => {
                   setNotes(
-                    "Confirm cash drawer at close and sync totals with finance before 7 PM.",
+                    "Confirmar el cajón de efectivo al cierre y sincronizar los totales con finanzas antes de las 7 PM.",
                   );
                   setNotesMessage(null);
                 }}
               >
-                Reset note
+                Restablecer nota
               </Button>
-              <Button onClick={handleSaveNotes}>Save for shift</Button>
+              <Button onClick={handleSaveNotes}>Guardar para el turno</Button>
             </CardFooter>
           </Card>
         </div>
