@@ -6,18 +6,18 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const benefits = [
   {
-    title: "Unified customer records",
-    description: "Centralize notes, emails, and deal history so your team is always aligned.",
+    title: "Registros de clientes unificados",
+    description: "Centraliza notas, correos electrónicos e historial de acuerdos para que tu equipo esté siempre alineado.",
     icon: Contact,
   },
   {
-    title: "Automated workflows",
-    description: "Trigger follow-ups and reminders the moment pipeline milestones change.",
+    title: "Flujos de trabajo automatizados",
+    description: "Activa seguimientos y recordatorios en el momento en que cambian los hitos del pipeline.",
     icon: Sparkles,
   },
   {
-    title: "Real-time insights",
-    description: "Forecast revenue with confidence using visual dashboards and health scores.",
+    title: "Información en tiempo real",
+    description: "Pronostica ingresos con confianza utilizando paneles visuales y puntuaciones de salud.",
     icon: BarChart3,
   },
 ];
@@ -30,23 +30,23 @@ export default function Home() {
       <main className="flex flex-1 flex-col items-center px-6 pb-24 pt-24 sm:px-10 lg:px-16">
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-4 py-1 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">
-            Trusted CRM for high-performing teams
+            CRM de confianza para equipos de alto rendimiento
           </span>
           <h1 className="mt-8 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-            Build momentum with every customer conversation.
+            Genera impulso con cada conversación con el cliente.
           </h1>
           <p className="mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
-            CRM Ganamos gives sales and success teams a shared workspace to organize deals, automate follow-ups, and deliver winning experiences.
+            CRM Ganamos ofrece a los equipos de ventas y éxito un espacio de trabajo compartido para organizar acuerdos, automatizar seguimientos y ofrecer experiencias ganadoras.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Button asChild size="lg" className="px-8">
               <Link href="/register">
-                Start free trial
+                Iniciar prueba gratuita
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="px-8">
-              <Link href="/login">Sign in</Link>
+              <Link href="/login">Iniciar sesión</Link>
             </Button>
           </div>
         </div>
@@ -68,16 +68,16 @@ export default function Home() {
       </main>
       <footer className="border-t border-border/70 bg-background/80 py-8">
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
-          <p>© {currentYear} CRM Ganamos. All rights reserved.</p>
+          <p>© {currentYear} CRM Ganamos. Todos los derechos reservados.</p>
           <div className="flex gap-6">
             <Link href="/login" className="transition hover:text-foreground">
-              Login
+              Iniciar sesión
             </Link>
             <Link href="/register" className="transition hover:text-foreground">
-              Register
+              Registrarse
             </Link>
             <Link href="#" className="transition hover:text-foreground">
-              Privacy
+              Privacidad
             </Link>
           </div>
         </div>
