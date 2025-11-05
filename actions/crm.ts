@@ -39,7 +39,6 @@ export async function createClientAction(input: CreateClientInput) {
     data: {
       username: data.username,
       phone: data.phone ?? null,
-      fullName: data.fullName ?? null,
       marketingSourceId: data.marketingSourceId ?? null,
       status: ClientStatus.ACTIVE,
     },
@@ -66,7 +65,6 @@ export async function updateClientAction(input: UpdateClientInput) {
     data: {
       username: data.username,
       phone: data.phone ?? null,
-      fullName: data.fullName ?? null,
       marketingSourceId: data.marketingSourceId ?? null,
       status: data.status,
     },
@@ -341,7 +339,6 @@ export async function getDailyChargeSheetAction(input: DailySheetInput) {
       clientId: client.id,
       username: client.username,
       phone: client.phone,
-      fullName: client.fullName,
       status: client.status,
       hasCharged: check?.hasCharged ?? null, // null: not checked yet
       checkedAt: check?.checkedAt ?? null,
