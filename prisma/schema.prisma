@@ -4,20 +4,20 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 // ---------- Internal users: cashiers / admins / agents ----------
 model User {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   name      String
-  email     String    @unique
-  role      UserRole  @default(CASHIER)
-  isActive  Boolean   @default(true)
+  email     String   @unique
+  role      UserRole @default(CASHIER)
+  isActive  Boolean  @default(true)
 
   // relations
   pointTransactions PointTransaction[] @relation("TransactionPerformedBy")
@@ -33,22 +33,21 @@ enum UserRole {
 
 // ---------- Players / clients of the platform ----------
 model Client {
-  id                Int                 @id @default(autoincrement())
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // minimal identification
-  username          String              @unique
-  phone             String?             @unique
-  fullName          String?
+  username String  @unique
+  phone    String? @unique
 
-  status            ClientStatus        @default(ACTIVE)
+  status ClientStatus @default(ACTIVE)
 
   // points = pesos
-  pointsBalance     Int                 @default(0)
+  pointsBalance Int @default(0)
 
   // how they came to us (ads, organic, etc.)
-  marketingSource   MarketingSource?    @relation(fields: [marketingSourceId], references: [id])
+  marketingSource   MarketingSource? @relation(fields: [marketingSourceId], references: [id])
   marketingSourceId Int?
 
   // relations
@@ -66,40 +65,40 @@ enum ClientStatus {
 // ---------- Where did this client come from? (ads etc.) ----------
 model MarketingSource {
   id        Int      @id @default(autoincrement())
-  name      String   // e.g. "Instagram Ads", "TikTok Ads"
-  platform  String?  // "instagram", "facebook", "tiktok", etc.
-  campaign  String?  // campaign name or id from Ads Manager
+  name      String // e.g. "Instagram Ads", "TikTok Ads"
+  platform  String? // "instagram", "facebook", "tiktok", etc.
+  campaign  String? // campaign name or id from Ads Manager
   createdAt DateTime @default(now())
 
-  clients   Client[]
+  clients Client[]
 }
 
 // ---------- All movements of points (money) ----------
 model PointTransaction {
-  id            Int              @id @default(autoincrement())
-  createdAt     DateTime         @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  client        Client           @relation(fields: [clientId], references: [id])
-  clientId      Int
+  client   Client @relation(fields: [clientId], references: [id])
+  clientId Int
 
-  amount        Int              // + for charge, - for redeem
-  type          TransactionType
-  method        PaymentMethod?
+  amount Int // + for charge, - for redeem
+  type   TransactionType
+  method PaymentMethod?
 
   description   String?
-  referenceCode String?          // ticket number, transaction id, etc.
+  referenceCode String? // ticket number, transaction id, etc.
 
-  cashier       User?            @relation("TransactionPerformedBy", fields: [cashierId], references: [id])
-  cashierId     Int?
+  cashier   User? @relation("TransactionPerformedBy", fields: [cashierId], references: [id])
+  cashierId Int?
 
   @@index([clientId, createdAt])
   @@index([cashierId, createdAt])
 }
 
 enum TransactionType {
-  CHARGE       // user loaded points
-  REDEEM       // user spent points
-  ADJUSTMENT   // manual corrections
+  CHARGE // user loaded points
+  REDEEM // user spent points
+  ADJUSTMENT // manual corrections
 }
 
 enum PaymentMethod {
@@ -112,20 +111,20 @@ enum PaymentMethod {
 
 // ---------- Contacts / conversations with the client ----------
 model ClientContact {
-  id          Int               @id @default(autoincrement())
-  createdAt   DateTime          @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  client      Client            @relation(fields: [clientId], references: [id])
-  clientId    Int
+  client   Client @relation(fields: [clientId], references: [id])
+  clientId Int
 
-  channel     ContactChannel
-  direction   ContactDirection
+  channel   ContactChannel
+  direction ContactDirection
 
-  viaAd       Boolean           @default(false) // came from ad?
-  campaign    String?           // optional ads campaign id/name
-  message     String?           // notes of what was talked
+  viaAd    Boolean @default(false) // came from ad?
+  campaign String? // optional ads campaign id/name
+  message  String? // notes of what was talked
 
-  handledBy   User?             @relation("ContactsCreatedBy", fields: [handledById], references: [id])
+  handledBy   User? @relation("ContactsCreatedBy", fields: [handledById], references: [id])
   handledById Int?
 
   @@index([clientId, createdAt])
@@ -144,24 +143,24 @@ enum ContactChannel {
 }
 
 enum ContactDirection {
-  INBOUND   // client -> us
-  OUTBOUND  // us -> client
+  INBOUND // client -> us
+  OUTBOUND // us -> client
 }
 
 // ---------- Daily checkbox: did this client charge today? ----------
 model DailyChargeCheck {
-  id          Int       @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
   // Store as midnight of that day, and in the app you treat it as "date"
-  date        DateTime
+  date DateTime
 
-  client      Client    @relation(fields: [clientId], references: [id])
-  clientId    Int
+  client   Client @relation(fields: [clientId], references: [id])
+  clientId Int
 
-  hasCharged  Boolean   // cashier's checkbox: yes/no
-  checkedAt   DateTime  @default(now())
+  hasCharged Boolean // cashier's checkbox: yes/no
+  checkedAt  DateTime @default(now())
 
-  checkedBy   User?     @relation("DailyChecksPerformedBy", fields: [checkedById], references: [id])
+  checkedBy   User? @relation("DailyChecksPerformedBy", fields: [checkedById], references: [id])
   checkedById Int?
 
   @@unique([clientId, date]) // only one check per client per day

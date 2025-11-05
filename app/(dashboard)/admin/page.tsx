@@ -330,55 +330,6 @@ export default function AdminDashboardPage() {
             )}
           </CardContent>
         </Card>
-
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Destacados semanales
-            </CardTitle>
-            <CardDescription>
-              Victorias rápidas y riesgos para compartir con el liderazgo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/40 p-4">
-              <TrendingUp className="mt-0.5 size-5 text-primary" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">
-                  Oportunidad de expansión con Grupo Atalaya
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Solicitaron precios para puestos de análisis. Preparar
-                  propuesta antes del QBR del jueves.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/40 p-4">
-              <Target className="mt-0.5 size-5 text-amber-600" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">
-                  Mercado Verde requiere un punto de contacto ejecutivo
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Implementación bloqueada por revisión legal. Programar llamada
-                  de liderazgo para desbloquear el contrato.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/40 p-4">
-              <Activity className="mt-0.5 size-5 text-emerald-600" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">
-                  Nueva encuesta de salud lanzada
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Enviar encuesta de pulso a las 20 cuentas principales y
-                  revisar los conocimientos en la sincronización del lunes.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

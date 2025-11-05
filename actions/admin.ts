@@ -2,7 +2,9 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { TransactionType, UserRole } from "@prisma/client";
+import { TransactionType, UserRole } from "@/generated/prisma/enums";
+
+// ---- Tipos del dashboard (VIEW MODELS, no son el schema) ----
 
 export type TeamMemberStatus = "En curso" | "En riesgo" | "Nuevo ingreso";
 
@@ -14,20 +16,20 @@ export type ClientHealthStatus =
   | "En riesgo";
 
 export type TeamMember = {
-  id: string;
+  id: string; // tm-<userId>
   name: string;
   email: string;
-  role: string; // label amigable, no el enum de Prisma
+  role: string; // label amigable
   status: TeamMemberStatus;
   activeDeals: number;
   lastActive: string; // YYYY-MM-DD
 };
 
 export type ClientAccount = {
-  id: string;
-  company: string;
-  poc: string;
-  email: string;
+  id: string; // cl-<clientId>
+  company: string; // label de UI, derivado de username o del form
+  poc: string; // label de UI
+  email: string; // label de UI (no se guarda)
   stage: ClientLifecycleStage;
   monthlyValue: number;
   health: ClientHealthStatus;
@@ -35,6 +37,8 @@ export type ClientAccount = {
   onboardingDays: number;
   notes?: string;
 };
+
+// ---- Helpers ----
 
 function diffDays(a: Date, b: Date) {
   const ms = b.getTime() - a.getTime();
@@ -54,6 +58,8 @@ function mapUserRoleToLabel(role: UserRole): string {
   }
 }
 
+// ---- Carga del dashboard ----
+
 export async function getAdminDashboardData(): Promise<{
   teamMembers: TeamMember[];
   clients: ClientAccount[];
@@ -66,7 +72,7 @@ export async function getAdminDashboardData(): Promise<{
 
   const [users, clients, recentCharges, recentContacts] = await Promise.all([
     prisma.user.findMany(),
-    prisma.client.findMany(),
+    prisma.client.findMany(), // usa sólo campos del schema: id, createdAt, updatedAt, username, etc.
     prisma.pointTransaction.findMany({
       where: {
         type: TransactionType.CHARGE,
@@ -88,6 +94,7 @@ export async function getAdminDashboardData(): Promise<{
     totalChargedLast30: number;
     lastInteractionAt?: Date;
   };
+
   const clientStats = new Map<number, ClientStats>();
 
   for (const tx of recentCharges) {
@@ -95,17 +102,14 @@ export async function getAdminDashboardData(): Promise<{
       totalChargedLast30: 0,
     };
 
-    // última carga
     if (!stats.lastChargeAt || tx.createdAt > stats.lastChargeAt) {
       stats.lastChargeAt = tx.createdAt;
     }
 
-    // total último mes
     if (tx.createdAt >= thirtyDaysAgo) {
       stats.totalChargedLast30 += tx.amount;
     }
 
-    // interacción
     if (!stats.lastInteractionAt || tx.createdAt > stats.lastInteractionAt) {
       stats.lastInteractionAt = tx.createdAt;
     }
@@ -133,10 +137,12 @@ export async function getAdminDashboardData(): Promise<{
     lastActiveAt?: Date;
     activeClientIds: Set<number>;
   };
+
   const userStats = new Map<number, UserStats>();
 
   for (const tx of recentCharges) {
     if (!tx.cashierId) continue;
+
     const stats = userStats.get(tx.cashierId) ?? {
       activeClientIds: new Set<number>(),
     };
@@ -144,8 +150,8 @@ export async function getAdminDashboardData(): Promise<{
     if (!stats.lastActiveAt || tx.createdAt > stats.lastActiveAt) {
       stats.lastActiveAt = tx.createdAt;
     }
-    stats.activeClientIds.add(tx.clientId);
 
+    stats.activeClientIds.add(tx.clientId);
     userStats.set(tx.cashierId, stats);
   }
 
@@ -177,13 +183,13 @@ export async function getAdminDashboardData(): Promise<{
     const lastInteraction = stats?.lastInteractionAt ?? created;
     const lastCharge = stats?.lastChargeAt;
 
-    // Etapa según días desde alta
+    // Etapa inventada para el dashboard (no se guarda en DB)
     let stage: ClientLifecycleStage;
     if (onboardingDays <= 14) stage = "Incorporación";
     else if (onboardingDays <= 60) stage = "Nutrición";
     else stage = "Expansión";
 
-    // Salud según recencia de la última carga
+    // Salud según recencia de la última carga (también sólo para la vista)
     let health: ClientHealthStatus;
     if (!lastCharge) {
       health = "En riesgo";
@@ -198,10 +204,10 @@ export async function getAdminDashboardData(): Promise<{
 
     return {
       id: `cl-${client.id}`,
-      company: client.fullName ?? client.username,
-      poc: client.fullName ?? client.username,
-      // no tenemos email de cliente en el schema; podés cambiar esto luego
-      email: `${client.username}@cliente.local`,
+      // 👇 Estos son labels de UI. No son campos del schema.
+      company: client.username,
+      poc: client.username,
+      email: "", // no existe email en el schema, así que lo dejamos vacío
       stage,
       monthlyValue,
       health,
@@ -211,10 +217,13 @@ export async function getAdminDashboardData(): Promise<{
     };
   });
 
-  return { teamMembers, clients: clientAccounts };
+  return {
+    teamMembers,
+    clients: clientAccounts,
+  };
 }
 
-// ---- Mutaciones simples ----
+// ---- Mutaciones ----
 
 export async function addTeamMember(input: {
   name: string;
@@ -222,15 +231,15 @@ export async function addTeamMember(input: {
   roleLabel: string;
   status: TeamMemberStatus;
 }): Promise<TeamMember> {
-  const { name, email, roleLabel } = input;
+  const { name, email, roleLabel, status } = input;
 
-  if (!name || !email) {
-    throw new Error("Nombre y correo son obligatorios.");
+  if (!name || !email || !roleLabel) {
+    throw new Error("Nombre, correo y rol son obligatorios.");
   }
 
-  // Mapear el label libre a un rol de permisos del sistema
   const lower = roleLabel.toLowerCase();
   let systemRole: UserRole = "AGENT";
+
   if (lower.includes("admin") || lower.includes("director")) {
     systemRole = "ADMIN";
   } else if (lower.includes("cajero") || lower.includes("cashier")) {
@@ -248,17 +257,17 @@ export async function addTeamMember(input: {
 
   const now = new Date();
 
-  const teamMember: TeamMember = {
+  const member: TeamMember = {
     id: `tm-${dbUser.id}`,
     name: dbUser.name,
     email: dbUser.email,
     role: roleLabel.trim() || mapUserRoleToLabel(dbUser.role),
-    status: input.status,
+    status,
     activeDeals: 0,
     lastActive: now.toISOString().slice(0, 10),
   };
 
-  return teamMember;
+  return member;
 }
 
 export async function addClientAccount(input: {
@@ -275,29 +284,29 @@ export async function addClientAccount(input: {
 
   if (!company || !poc || !email) {
     throw new Error(
-      "Nombre de empresa, punto de contacto y correo son obligatorios.",
+      "Nombre de empresa, punto de contacto y correo son obligatorios en el formulario.",
     );
   }
 
-  // Creamos un Client básico en tu schema (jugador/cliente)
+  // 👇 A NIVEL DB: sólo persistimos username, nada más.
   const baseUsername = company
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
-  const uniqueUsername = `${baseUsername}-${Date.now()}`;
+
+  const username = (baseUsername || "client") + "-" + Date.now();
 
   const dbClient = await prisma.client.create({
     data: {
-      username: uniqueUsername,
-      fullName: company.trim(),
-      phone: null,
-      status: "ACTIVE",
+      username,
+      // NADA MÁS: ni phone, ni status, ni marketingSource, etc.
+      // status usa el default (ACTIVE), pointsBalance default(0), etc.
     },
   });
 
   const now = new Date();
-  const lastInteraction = now;
 
+  // Salud para la vista (no se guarda)
   const health: ClientHealthStatus =
     stage === "Expansión"
       ? "Saludable"
@@ -307,13 +316,14 @@ export async function addClientAccount(input: {
 
   const clientAccount: ClientAccount = {
     id: `cl-${dbClient.id}`,
+    // Estos son datos de UI, no campos de la tabla Client
     company: company.trim(),
     poc: poc.trim(),
     email: email.trim(),
     stage,
     monthlyValue: Number.isFinite(monthlyValue) ? monthlyValue : 0,
     health,
-    lastInteraction: lastInteraction.toISOString().slice(0, 10),
+    lastInteraction: now.toISOString().slice(0, 10),
     onboardingDays: Number.isFinite(onboardingDays) ? onboardingDays : 14,
     notes: notes?.trim() || undefined,
   };

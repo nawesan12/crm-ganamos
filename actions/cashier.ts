@@ -2,7 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { PaymentMethod, TransactionType } from "@prisma/client";
+import { PaymentMethod, TransactionType } from "@/generated/prisma/enums";
 
 export type MembershipTier = "Premium" | "Estándar" | "Empresarial";
 
