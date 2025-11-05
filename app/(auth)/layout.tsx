@@ -32,7 +32,7 @@ export default function AuthLayout({
 
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/70 p-12 text-primary-foreground lg:flex">
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-violet-700 via-purple-800 to-black p-12 text-primary-foreground lg:flex">
         <div className="relative z-10 flex items-center justify-between text-sm text-primary-foreground/70">
           <Link
             href="/"
