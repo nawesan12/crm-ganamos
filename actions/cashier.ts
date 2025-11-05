@@ -4,15 +4,14 @@
 import { prisma } from "@/lib/prisma";
 import { PaymentMethod, TransactionType } from "@prisma/client";
 
-// TIPOS que vas a usar también en el componente cliente
 export type MembershipTier = "Premium" | "Estándar" | "Empresarial";
 
 export type LedgerMember = {
   id: number;
   name: string;
-  membership: MembershipTier; // por ahora “fake” mientras no exista en la DB
+  membership: MembershipTier;
   coinsThisMonth: number;
-  lastCharge?: string; // YYYY-MM-DD
+  lastCharge?: string;
   visitWindow?: string;
   preferences?: string;
 };
