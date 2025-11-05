@@ -14,8 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 
 export const metadata: Metadata = {
-  title: "Sign in | CRM Ganamos",
-  description: "Log in to access your CRM Ganamos workspace.",
+  title: "Iniciar sesión | CRM Ganamos",
+  description: "Accedé a tu espacio de trabajo en CRM Ganamos.",
 };
 
 export default function LoginPage() {
@@ -23,34 +23,37 @@ export default function LoginPage() {
     <Card className="w-full border-border/80">
       <CardHeader className="space-y-4">
         <CardTitle className="text-2xl font-semibold tracking-tight">
-          Sign in
+          Iniciar sesión
         </CardTitle>
         <CardDescription>
-          Welcome back! Please enter your credentials to continue.
+          ¡Bienvenido de nuevo! Ingresá tus credenciales para continuar.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-5">
           <div className="grid gap-2">
-            <label htmlFor="email" className="text-sm font-medium text-foreground">
-              Email address
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-foreground"
+            >
+              Correo electrónico
             </label>
             <Input
               id="email"
               type="email"
               autoComplete="email"
-              placeholder="you@company.com"
+              placeholder="tucorreo@empresa.com"
               required
             />
           </div>
           <div className="grid gap-2">
             <div className="flex items-center justify-between text-sm font-medium text-foreground">
-              <label htmlFor="password">Password</label>
+              <label htmlFor="password">Contraseña</label>
               <Link
                 href="#"
                 className="text-sm font-medium text-primary transition hover:text-primary/80"
               >
-                Forgot password?
+                ¿Olvidaste tu contraseña?
               </Link>
             </div>
             <Input
@@ -63,13 +66,13 @@ export default function LoginPage() {
           </div>
           <Button type="submit" className="w-full">
             <LogIn className="size-4" />
-            Sign in
+            Ingresar
           </Button>
         </form>
         <div className="mt-6 space-y-3 text-center text-sm text-muted-foreground">
           <p className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground/70">
             <span className="h-px flex-1 bg-border" />
-            or continue with
+            o continuar con
             <span className="h-px flex-1 bg-border" />
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -115,13 +118,17 @@ export default function LoginPage() {
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm text-muted-foreground">
         <div>
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-medium text-primary hover:text-primary/80">
-            Create one
+          ¿No tenés una cuenta?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-primary hover:text-primary/80"
+          >
+            Creá una
           </Link>
         </div>
         <p className="text-xs text-muted-foreground/80">
-          By continuing, you agree to our Terms of Service and acknowledge our Privacy Policy.
+          Al continuar, aceptás nuestros Términos de Servicio y reconocés
+          nuestra Política de Privacidad.
         </p>
       </CardFooter>
     </Card>

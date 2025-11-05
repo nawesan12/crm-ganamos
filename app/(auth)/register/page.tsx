@@ -14,8 +14,9 @@ import {
 import { Input } from "@/components/ui/input";
 
 export const metadata: Metadata = {
-  title: "Create account | CRM Ganamos",
-  description: "Register for CRM Ganamos to start managing deals and relationships.",
+  title: "Crear cuenta | CRM Ganamos",
+  description:
+    "Registrate en CRM Ganamos para empezar a gestionar oportunidades y relaciones.",
 };
 
 export default function RegisterPage() {
@@ -23,30 +24,36 @@ export default function RegisterPage() {
     <Card className="w-full border-border/80">
       <CardHeader className="space-y-4">
         <CardTitle className="text-2xl font-semibold tracking-tight">
-          Create your account
+          Creá tu cuenta
         </CardTitle>
         <CardDescription>
-          Start your 14-day free trial. No credit card required.
+          Empezá tu prueba gratis de 14 días. No necesitás tarjeta de crédito.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-5">
           <div className="grid gap-2 sm:grid-cols-2 sm:gap-4">
             <div className="grid gap-2">
-              <label htmlFor="firstName" className="text-sm font-medium text-foreground">
-                First name
+              <label
+                htmlFor="firstName"
+                className="text-sm font-medium text-foreground"
+              >
+                Nombre
               </label>
               <Input
                 id="firstName"
                 name="firstName"
                 autoComplete="given-name"
-                placeholder="Maria"
+                placeholder="María"
                 required
               />
             </div>
             <div className="grid gap-2">
-              <label htmlFor="lastName" className="text-sm font-medium text-foreground">
-                Last name
+              <label
+                htmlFor="lastName"
+                className="text-sm font-medium text-foreground"
+              >
+                Apellido
               </label>
               <Input
                 id="lastName"
@@ -58,8 +65,11 @@ export default function RegisterPage() {
             </div>
           </div>
           <div className="grid gap-2">
-            <label htmlFor="company" className="text-sm font-medium text-foreground">
-              Company name
+            <label
+              htmlFor="company"
+              className="text-sm font-medium text-foreground"
+            >
+              Nombre de la empresa
             </label>
             <Input
               id="company"
@@ -69,42 +79,58 @@ export default function RegisterPage() {
             />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="email" className="text-sm font-medium text-foreground">
-              Work email
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-foreground"
+            >
+              Correo de trabajo
             </label>
             <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="you@company.com"
+              placeholder="tucorreo@empresa.com"
               required
             />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="password" className="text-sm font-medium text-foreground">
-              Password
+            <label
+              htmlFor="password"
+              className="text-sm font-medium text-foreground"
+            >
+              Contraseña
             </label>
             <Input
               id="password"
               name="password"
               type="password"
               autoComplete="new-password"
-              placeholder="Create a strong password"
+              placeholder="Creá una contraseña segura"
               required
             />
           </div>
           <div className="space-y-3 text-xs text-muted-foreground">
             <label className="flex items-start gap-2 text-left">
-              <input type="checkbox" required className="mt-1 size-4 rounded border border-input" />
+              <input
+                type="checkbox"
+                required
+                className="mt-1 size-4 rounded border border-input"
+              />
               <span>
-                I agree to the{" "}
-                <Link href="#" className="font-medium text-primary hover:text-primary/80">
-                  Terms of Service
+                Acepto los{" "}
+                <Link
+                  href="#"
+                  className="font-medium text-primary hover:text-primary/80"
+                >
+                  Términos de Servicio
                 </Link>{" "}
-                and{" "}
-                <Link href="#" className="font-medium text-primary hover:text-primary/80">
-                  Privacy Policy
+                y la{" "}
+                <Link
+                  href="#"
+                  className="font-medium text-primary hover:text-primary/80"
+                >
+                  Política de Privacidad
                 </Link>
                 .
               </span>
@@ -112,21 +138,27 @@ export default function RegisterPage() {
           </div>
           <Button type="submit" className="w-full">
             <UserPlus className="size-4" />
-            Create account
+            Crear cuenta
           </Button>
         </form>
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm text-muted-foreground">
         <div>
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:text-primary/80">
-            Sign in
+          ¿Ya tenés una cuenta?{" "}
+          <Link
+            href="/login"
+            className="font-medium text-primary hover:text-primary/80"
+          >
+            Iniciar sesión
           </Link>
         </div>
         <p className="text-xs text-muted-foreground/80">
-          Need help onboarding your team?{" "}
-          <Link href="#" className="font-medium text-primary hover:text-primary/80">
-            Talk to sales
+          ¿Necesitás ayuda para incorporar a tu equipo?{" "}
+          <Link
+            href="#"
+            className="font-medium text-primary hover:text-primary/80"
+          >
+            Hablá con ventas
           </Link>
           .
         </p>
