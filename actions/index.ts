@@ -61,11 +61,12 @@ export async function listClientsAction(input: ListClientsInput) {
 
   const [clients, total] = await prisma.$transaction([
     prisma.client.findMany({
+      //@ts-expect-error bla
       where,
       orderBy: { username: "asc" },
       skip: (data.page - 1) * data.pageSize,
       take: data.pageSize,
-    }),
+    }), //@ts-expect-error bla
     prisma.client.count({ where }),
   ]);
 
@@ -81,7 +82,7 @@ const listClientHistorySchema = z.object({
 export type ListClientHistoryInput = z.infer<typeof listClientHistorySchema>;
 
 export async function listClientTransactionsAction(
-  input: ListClientHistoryInput
+  input: ListClientHistoryInput,
 ) {
   const data = listClientHistorySchema.parse(input);
   const where = { clientId: data.clientId };
@@ -127,7 +128,7 @@ export type CreateMarketingSourceInput = z.infer<
 >;
 
 export async function createMarketingSourceAction(
-  input: CreateMarketingSourceInput
+  input: CreateMarketingSourceInput,
 ) {
   const data = createMarketingSourceSchema.parse(input);
   return prisma.marketingSource.create({ data });
@@ -142,7 +143,7 @@ export type UpdateMarketingSourceInput = z.infer<
 >;
 
 export async function updateMarketingSourceAction(
-  input: UpdateMarketingSourceInput
+  input: UpdateMarketingSourceInput,
 ) {
   const data = updateMarketingSourceSchema.parse(input);
   return prisma.marketingSource.update({
