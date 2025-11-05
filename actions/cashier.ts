@@ -8,18 +8,18 @@ export type MembershipTier = "Premium" | "Estándar" | "Empresarial";
 
 export type LedgerMember = {
   id: number;
-  name: string;
+  name: string; // viene de client.username
   membership: MembershipTier;
   coinsThisMonth: number;
-  lastCharge?: string;
+  lastCharge?: string; // YYYY-MM-DD
   visitWindow?: string;
   preferences?: string;
 };
 
 export type ChargeLogEntry = {
   id: string;
-  userId: number;
-  userName: string;
+  userId: number; // clientId
+  userName: string; // client.username
   coins: number;
   timestamp: string;
   note?: string;
@@ -55,10 +55,10 @@ export async function getCashierDashboardData(selectedDate: string) {
   const { start: dayStart, end: dayEnd } = getDayRange(selectedDate);
   const { start: monthStart, end: monthEnd } = getMonthRange(selectedDate);
 
-  // 1) Clientes activos
+  // 1) Clientes activos (según enum ClientStatus en tu schema)
   const clients = await prisma.client.findMany({
     where: {
-      status: "ACTIVE",
+      status: "ACTIVE", // o ClientStatus.ACTIVE si lo importás
     },
   });
 
@@ -119,12 +119,12 @@ export async function getCashierDashboardData(selectedDate: string) {
       ? agg._max.createdAt.toISOString().slice(0, 10)
       : undefined;
 
-    // Por ahora mapeamos membership “inventado” (hasta que lo agregues al schema)
+    // “membership” sigue siendo sólo para UI hasta que lo agregues al schema
     const membership: MembershipTier = "Estándar";
 
     return {
       id: client.id,
-      name: client.fullName ?? client.username,
+      name: client.username, // 👈 único identificador real que tenés en el schema
       membership,
       coinsThisMonth,
       lastCharge: lastChargeIso,
@@ -136,7 +136,7 @@ export async function getCashierDashboardData(selectedDate: string) {
   const chargeLog: ChargeLogEntry[] = dayCharges.map((tx) => ({
     id: tx.id.toString(),
     userId: tx.clientId,
-    userName: tx.client.fullName ?? tx.client.username,
+    userName: tx.client.username, // 👈 nada de fullName
     coins: tx.amount,
     timestamp: tx.createdAt.toISOString(),
     note: tx.description ?? undefined,
@@ -220,14 +220,12 @@ export async function registerCharge(params: {
   const newChargeLogEntry: ChargeLogEntry = {
     id: result.transaction.id.toString(),
     userId: result.transaction.clientId,
-    userName:
-      result.transaction.client.fullName ?? result.transaction.client.username,
+    userName: result.transaction.client.username, // 👈 de nuevo, sólo username
     coins,
     timestamp: result.transaction.createdAt.toISOString(),
     note: result.transaction.description ?? undefined,
   };
 
-  // Devolvemos lo necesario para actualizar el front sin re-fetch completo
   return {
     clientId,
     newBalance: result.client.pointsBalance,
