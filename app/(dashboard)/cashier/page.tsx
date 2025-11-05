@@ -1,6 +1,7 @@
+// app/(dashboard)/cashier/page.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   CalendarClock,
   CheckCircle2,
@@ -25,89 +26,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-type MembershipTier = "Premium" | "Estándar" | "Empresarial";
-
-type LedgerMember = {
-  id: string;
-  name: string;
-  membership: MembershipTier;
-  coinsThisMonth: number;
-  visitWindow: string;
-  lastCharge?: string;
-  preferences?: string;
-};
-
-type ChargeLogEntry = {
-  id: string;
-  userId: string;
-  userName: string;
-  coins: number;
-  timestamp: string;
-  note?: string;
-};
-
-const initialLedger: LedgerMember[] = [
-  {
-    id: "m-1",
-    name: "Carlos Mendoza",
-    membership: "Premium",
-    coinsThisMonth: 340,
-    visitWindow: "09:00 - 10:30",
-    lastCharge: "2024-08-20",
-    preferences: "Enviar factura por correo electrónico",
-  },
-  {
-    id: "m-2",
-    name: "Lucía Herrera",
-    membership: "Estándar",
-    coinsThisMonth: 180,
-    visitWindow: "11:00 - 12:30",
-    lastCharge: "2024-08-21",
-    preferences: "Prefiere recibo en efectivo",
-  },
-  {
-    id: "m-3",
-    name: "Andrés Quiroz",
-    membership: "Empresarial",
-    coinsThisMonth: 520,
-    visitWindow: "14:00 - 15:30",
-    lastCharge: "2024-08-19",
-    preferences: "Validar identificación antes de entregar monedas",
-  },
-  {
-    id: "m-4",
-    name: "Sara Domínguez",
-    membership: "Premium",
-    coinsThisMonth: 260,
-    visitWindow: "16:00 - 18:00",
-    lastCharge: "2024-08-18",
-  },
-];
-
-const initialChargeLog: ChargeLogEntry[] = [
-  {
-    id: "log-1",
-    userId: "m-5",
-    userName: "Julieta Ramos",
-    coins: 150,
-    timestamp: "2024-08-21T10:45:00.000Z",
-    note: "Precargado del turno de la mañana",
-  },
-  {
-    id: "log-2",
-    userId: "m-2",
-    userName: "Lucía Herrera",
-    coins: 80,
-    timestamp: "2024-08-21T12:15:00.000Z",
-  },
-  {
-    id: "log-3",
-    userId: "m-1",
-    userName: "Carlos Mendoza",
-    coins: 120,
-    timestamp: "2024-08-20T17:40:00.000Z",
-  },
-];
+import {
+  LedgerMember,
+  ChargeLogEntry,
+  MembershipTier,
+  getCashierDashboardData,
+  registerCharge,
+} from "../../../actions/cashier";
 
 const coinFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
@@ -116,28 +41,45 @@ const coinFormatter = new Intl.NumberFormat("en-US", {
 export default function CashierDashboardPage() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(todayIso);
-  const [ledger, setLedger] = useState<LedgerMember[]>(initialLedger);
-  const [chargeLog, setChargeLog] = useState<ChargeLogEntry[]>(
-    initialChargeLog,
+  const [ledger, setLedger] = useState<LedgerMember[]>([]);
+  const [chargeLog, setChargeLog] = useState<ChargeLogEntry[]>([]);
+  const [pendingCharges, setPendingCharges] = useState<Record<number, string>>(
+    {},
   );
-  const [pendingCharges, setPendingCharges] = useState<Record<string, string>>({});
-  const [rowFeedback, setRowFeedback] = useState<Record<string, string | null>>({});
+  const [rowFeedback, setRowFeedback] = useState<Record<number, string | null>>(
+    {},
+  );
   const [tierFilter, setTierFilter] = useState<"all" | MembershipTier>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [notes, setNotes] = useState(
     "Confirmar el cajón de efectivo al cierre y sincronizar los totales con finanzas antes de las 7 PM.",
   );
   const [notesMessage, setNotesMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  // Cargar datos cuando cambia la fecha
+  useEffect(() => {
+    startTransition(() => {
+      getCashierDashboardData(selectedDate)
+        .then((data) => {
+          setLedger(data.ledger);
+          setChargeLog(data.chargeLog);
+          setPendingCharges({});
+          setRowFeedback({});
+        })
+        .catch((error) => {
+          console.error("Error loading dashboard data", error);
+        });
+    });
+  }, [selectedDate]);
 
   const chargesForSelectedDate = useMemo(
-    () =>
-      chargeLog.filter((entry) => entry.timestamp.startsWith(selectedDate)),
+    () => chargeLog.filter((entry) => entry.timestamp.startsWith(selectedDate)),
     [chargeLog, selectedDate],
   );
 
   const coinsChargedToday = useMemo(
-    () =>
-      chargesForSelectedDate.reduce((acc, entry) => acc + entry.coins, 0),
+    () => chargesForSelectedDate.reduce((acc, entry) => acc + entry.coins, 0),
     [chargesForSelectedDate],
   );
 
@@ -150,7 +92,6 @@ export default function CashierDashboardPage() {
     if (chargesForSelectedDate.length === 0) {
       return 0;
     }
-
     return Math.round(coinsChargedToday / chargesForSelectedDate.length);
   }, [chargesForSelectedDate.length, coinsChargedToday]);
 
@@ -168,9 +109,7 @@ export default function CashierDashboardPage() {
         return false;
       }
 
-      if (!searchTerm) {
-        return true;
-      }
+      if (!searchTerm) return true;
 
       const normalized = searchTerm.toLowerCase();
       return (
@@ -180,7 +119,7 @@ export default function CashierDashboardPage() {
     });
   }, [ledger, tierFilter, searchTerm]);
 
-  const handleChargeSubmit = (memberId: string) => {
+  const handleChargeSubmit = async (memberId: number) => {
     const rawValue = pendingCharges[memberId];
     const coins = Number(rawValue);
 
@@ -193,46 +132,54 @@ export default function CashierDashboardPage() {
     }
 
     const member = ledger.find((item) => item.id === memberId);
-    if (!member) {
-      return;
-    }
+    if (!member) return;
 
-    setLedger((prev) =>
-      prev.map((item) =>
-        item.id === memberId
-          ? {
-              ...item,
-              coinsThisMonth: item.coinsThisMonth + coins,
-              lastCharge: selectedDate,
-            }
-          : item,
-      ),
-    );
-
-    const timePortion = new Date().toISOString().split("T")[1] ?? "00:00:00.000Z";
-
-    setChargeLog((prev) => [
-      {
-        id: `log-${Date.now()}`,
-        userId: memberId,
-        userName: member.name,
+    try {
+      // Persistimos en la DB
+      const result = await registerCharge({
+        clientId: memberId,
         coins,
-        timestamp: `${selectedDate}T${timePortion}`,
-      },
-      ...prev,
-    ]);
+        selectedDate,
+      });
 
-    setPendingCharges((prev) => ({
-      ...prev,
-      [memberId]: "",
-    }));
-    setRowFeedback((prev) => ({
-      ...prev,
-      [memberId]: `${coinFormatter.format(coins)} monedas registradas`,
-    }));
+      // Actualizamos el ledger local
+      setLedger((prev) =>
+        prev.map((item) =>
+          item.id === memberId
+            ? {
+                ...item,
+                coinsThisMonth: item.coinsThisMonth + coins,
+                lastCharge: result.lastChargeDate,
+              }
+            : item,
+        ),
+      );
+
+      // Agregamos el nuevo registro al log local
+      setChargeLog((prev) => [result.newChargeLogEntry, ...prev]);
+
+      // Limpiamos input + feedback
+      setPendingCharges((prev) => ({
+        ...prev,
+        [memberId]: "",
+      }));
+      setRowFeedback((prev) => ({
+        ...prev,
+        [memberId]: `${coinFormatter.format(coins)} monedas registradas`,
+      }));
+    } catch (error) {
+      console.error("Error al registrar cargo", error);
+      setRowFeedback((prev) => ({
+        ...prev,
+        [memberId]:
+          "No se pudo registrar el cargo. Intente nuevamente o contacte a soporte.",
+      }));
+    }
   };
 
   const handleSaveNotes = () => {
+    // Por ahora las notas quedan solo en el estado local
+    // Si querés que se guarden en DB, después hacemos un Notes model + server action
     setNotesMessage("Notas de turno guardadas para el equipo.");
   };
 
@@ -246,7 +193,10 @@ export default function CashierDashboardPage() {
           Conciliación diaria de monedas sin problemas
         </h1>
         <p className="max-w-3xl text-muted-foreground">
-          Registre cada visita de cliente, realice un seguimiento de las monedas entregadas y mantenga un registro instantáneo para finanzas. Los filtros y las notas rápidas ayudan al próximo turno a saber exactamente cómo están las cosas.
+          Registre cada visita de cliente, realice un seguimiento de las monedas
+          entregadas y mantenga un registro instantáneo para finanzas. Los
+          filtros y las notas rápidas ayudan al próximo turno a saber
+          exactamente cómo están las cosas.
         </p>
       </div>
 
@@ -309,7 +259,8 @@ export default function CashierDashboardPage() {
                 Tablero de cargos diarios
               </CardTitle>
               <CardDescription>
-                Capture las visitas de hoy con solo unos pocos clics. Los montos actualizan el libro mayor al instante.
+                Capture las visitas de hoy con solo unos pocos clics. Los montos
+                actualizan el libro mayor al instante.
               </CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -360,9 +311,14 @@ export default function CashierDashboardPage() {
                 <span className="text-right">Registrar cargo</span>
               </div>
               <div className="divide-y divide-border/60">
-                {filteredMembers.length === 0 ? (
+                {isPending && ledger.length === 0 ? (
                   <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    Ningún miembro coincide con los filtros. Ajuste la búsqueda o el nivel.
+                    Cargando datos del turno...
+                  </div>
+                ) : filteredMembers.length === 0 ? (
+                  <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                    Ningún miembro coincide con los filtros. Ajuste la búsqueda
+                    o el nivel.
                   </div>
                 ) : (
                   filteredMembers.map((member) => (
@@ -374,9 +330,11 @@ export default function CashierDashboardPage() {
                         <span className="font-medium text-foreground">
                           {member.name}
                         </span>
-                        <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                          {member.visitWindow}
-                        </span>
+                        {member.visitWindow && (
+                          <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                            {member.visitWindow}
+                          </span>
+                        )}
                         {member.preferences && (
                           <span className="text-xs text-muted-foreground">
                             {member.preferences}
@@ -441,7 +399,8 @@ export default function CashierDashboardPage() {
                 Registro de conciliación diaria
               </CardTitle>
               <CardDescription>
-                Todas las monedas registradas para la fecha seleccionada aparecen aquí al instante.
+                Todas las monedas registradas para la fecha seleccionada
+                aparecen aquí al instante.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -460,7 +419,8 @@ export default function CashierDashboardPage() {
                         {entry.userName}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {coinFormatter.format(entry.coins)} monedas • Registrado a las{" "}
+                        {coinFormatter.format(entry.coins)} monedas • Registrado
+                        a las{" "}
                         {new Date(entry.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
