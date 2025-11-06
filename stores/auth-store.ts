@@ -8,7 +8,7 @@ export type AuthRole = "ADMIN" | "CASHIER" | "AGENT";
 export type AuthUser = {
   id: number;
   name: string;
-  email: string;
+  username: string;
   role: AuthRole;
 };
 

@@ -72,17 +72,16 @@ export function LoginCard() {
         <form className="grid gap-5" onSubmit={handleSubmit}>
           <div className="grid gap-2">
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="text-sm font-medium text-foreground"
             >
-              Correo electrónico
+              Nombre de usuario
             </label>
             <Input
-              id="email"
-              name="email" // 👈 importante para FormData
-              type="email"
-              autoComplete="email"
-              placeholder="tucorreo@empresa.com"
+              id="username"
+              name="username" // 👈 importante para FormData
+              autoComplete="username"
+              placeholder="ganamos.cajero"
               required
             />
           </div>

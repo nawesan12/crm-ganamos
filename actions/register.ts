@@ -1,6 +1,7 @@
 // app/(auth)/register/actions.ts
 "use server";
 import { prisma } from "@/lib/prisma";
+import { hashPassword } from "@/lib/password";
 
 // Mantener en sync con tu enum UserRole de Prisma
 export type AuthRole = "ADMIN" | "CASHIER" | "AGENT";
@@ -8,7 +9,7 @@ export type AuthRole = "ADMIN" | "CASHIER" | "AGENT";
 export type RegisterUserPayload = {
   id: number;
   name: string;
-  email: string;
+  username: string;
   role: AuthRole;
 };
 
@@ -27,10 +28,10 @@ export async function registerAction(
 ): Promise<RegisterResult> {
   const firstName = String(formData.get("firstName") ?? "").trim();
   const lastName = String(formData.get("lastName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? ""); // por ahora no se usa
+  const username = String(formData.get("username") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
 
-  if (!firstName || !lastName || !email || !password) {
+  if (!firstName || !lastName || !username || !password) {
     return {
       success: false,
       error: "Completá todos los campos obligatorios.",
@@ -40,10 +41,12 @@ export async function registerAction(
   const fullName = `${firstName} ${lastName}`.trim();
 
   try {
+    const passwordHash = await hashPassword(password, 10);
     const dbUser = await prisma.user.create({
       data: {
         name: fullName,
-        email,
+        username,
+        passwordHash,
         // role y isActive usan los defaults del schema (CASHIER, true)
         // Podrías guardar `company` en otra tabla si querés más adelante.
       },
@@ -52,7 +55,7 @@ export async function registerAction(
     const user: RegisterUserPayload = {
       id: dbUser.id,
       name: dbUser.name,
-      email: dbUser.email,
+      username: dbUser.username,
       role: dbUser.role as AuthRole,
     };
 

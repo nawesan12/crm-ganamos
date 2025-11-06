@@ -1,13 +1,14 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/password";
 
 export type AuthRole = "ADMIN" | "CASHIER" | "AGENT";
 
 export type LoginUserPayload = {
   id: number;
   name: string;
-  email: string;
+  username: string;
   role: AuthRole;
 };
 
@@ -22,32 +23,40 @@ export type LoginResult =
     };
 
 export async function loginAction(formData: FormData): Promise<LoginResult> {
-  const email = String(formData.get("email") ?? "").trim();
+  const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) {
+  if (!username || !password) {
     return {
       success: false,
-      error: "Ingresá correo y contraseña.",
+      error: "Ingresá usuario y contraseña.",
     };
   }
 
   const dbUser = await prisma.user.findUnique({
-    where: { email },
+    where: { username },
   });
 
   if (!dbUser) {
     return {
       success: false,
-      error: "No encontramos un usuario con ese correo.",
+      error: "No encontramos un usuario con esas credenciales.",
     };
   }
 
-  // Acá podrías validar passwordHash en el futuro.
+  const isValidPassword = await verifyPassword(password, dbUser.passwordHash);
+
+  if (!isValidPassword) {
+    return {
+      success: false,
+      error: "Usuario o contraseña incorrectos.",
+    };
+  }
+
   const user: LoginUserPayload = {
     id: dbUser.id,
     name: dbUser.name,
-    email: dbUser.email,
+    username: dbUser.username,
     role: dbUser.role as AuthRole,
   };
 

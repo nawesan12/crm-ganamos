@@ -1,11 +1,13 @@
 "use server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { hashPassword } from "@/lib/password";
 import { UserRole } from "../generated/prisma/enums";
 
 const createUserSchema = z.object({
   name: z.string().min(3),
-  email: z.string().email(),
+  username: z.string().min(3),
+  password: z.string().min(6),
   role: z.nativeEnum(UserRole),
   isActive: z.boolean().default(true),
 });
@@ -14,20 +16,38 @@ export type CreateUserInput = z.infer<typeof createUserSchema>;
 
 export async function createUserAction(input: CreateUserInput) {
   const data = createUserSchema.parse(input);
-  return prisma.user.create({ data });
+  const { password, ...rest } = data;
+  const passwordHash = await hashPassword(password);
+
+  return prisma.user.create({
+    data: {
+      ...rest,
+      passwordHash,
+    },
+  });
 }
 
-const updateUserSchema = createUserSchema.extend({
-  id: z.number().int(),
-});
+const updateUserSchema = createUserSchema
+  .omit({ password: true })
+  .extend({
+    id: z.number().int(),
+    password: z.string().min(6).optional(),
+  });
 
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
 export async function updateUserAction(input: UpdateUserInput) {
   const data = updateUserSchema.parse(input);
+  const { id, password, ...rest } = data;
+  const passwordUpdate = password
+    ? { passwordHash: await hashPassword(password) }
+    : undefined;
   return prisma.user.update({
-    where: { id: data.id },
-    data,
+    where: { id },
+    data: {
+      ...rest,
+      ...passwordUpdate,
+    },
   });
 }
 

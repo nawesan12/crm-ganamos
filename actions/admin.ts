@@ -2,6 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { hashPassword } from "@/lib/password";
 import { TransactionType, UserRole } from "@/generated/prisma/enums";
 
 // ---- Tipos del dashboard (VIEW MODELS, no son el schema) ----
@@ -18,7 +19,7 @@ export type ClientHealthStatus =
 export type TeamMember = {
   id: string; // tm-<userId>
   name: string;
-  email: string;
+  username: string;
   role: string; // label amigable
   status: TeamMemberStatus;
   activeDeals: number;
@@ -168,7 +169,7 @@ export async function getAdminDashboardData(): Promise<{
     return {
       id: `tm-${user.id}`,
       name: user.name,
-      email: user.email,
+      username: user.username,
       role: mapUserRoleToLabel(user.role),
       status,
       activeDeals: stats?.activeClientIds.size ?? 0,
@@ -227,14 +228,15 @@ export async function getAdminDashboardData(): Promise<{
 
 export async function addTeamMember(input: {
   name: string;
-  email: string;
+  username: string;
+  password: string;
   roleLabel: string;
   status: TeamMemberStatus;
 }): Promise<TeamMember> {
-  const { name, email, roleLabel, status } = input;
+  const { name, username, password, roleLabel, status } = input;
 
-  if (!name || !email || !roleLabel) {
-    throw new Error("Nombre, correo y rol son obligatorios.");
+  if (!name || !username || !password || !roleLabel) {
+    throw new Error("Nombre, usuario, contraseña y rol son obligatorios.");
   }
 
   const lower = roleLabel.toLowerCase();
@@ -246,10 +248,13 @@ export async function addTeamMember(input: {
     systemRole = "CASHIER";
   }
 
+  const passwordHash = await hashPassword(password);
+
   const dbUser = await prisma.user.create({
     data: {
       name: name.trim(),
-      email: email.trim(),
+      username: username.trim(),
+      passwordHash,
       role: systemRole,
       isActive: true,
     },
@@ -260,7 +265,7 @@ export async function addTeamMember(input: {
   const member: TeamMember = {
     id: `tm-${dbUser.id}`,
     name: dbUser.name,
-    email: dbUser.email,
+    username: dbUser.username,
     role: roleLabel.trim() || mapUserRoleToLabel(dbUser.role),
     status,
     activeDeals: 0,
