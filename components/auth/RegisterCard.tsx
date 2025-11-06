@@ -1,11 +1,11 @@
-// app/(auth)/register/register-card.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 
+import { registerAction } from "@/actions/register";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,16 +16,23 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
-import { registerAction } from "@/actions/register";
+import { getDashboardRouteForRole } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth-store";
 
 export function RegisterCard() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.replace(getDashboardRouteForRole(user.role));
+    }
+  }, [isAuthenticated, router, user]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -43,14 +50,8 @@ export function RegisterCard() {
         return;
       }
 
-      // Guardamos el usuario recién creado en el store global
       login(result.user);
-
-      if (result.user.role === "ADMIN") {
-        router.push("/admin");
-      } else {
-        router.push("/cashier");
-      }
+      router.replace(getDashboardRouteForRole(result.user.role));
     } catch (err) {
       console.error(err);
       setError("Ocurrió un error al crear la cuenta. Intentá de nuevo.");
@@ -84,6 +85,7 @@ export function RegisterCard() {
                 autoComplete="given-name"
                 placeholder="María"
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="grid gap-2">
@@ -99,6 +101,7 @@ export function RegisterCard() {
                 autoComplete="family-name"
                 placeholder="Santos"
                 required
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -114,6 +117,7 @@ export function RegisterCard() {
               name="company"
               autoComplete="organization"
               placeholder="Ganamos Ventures"
+              disabled={isSubmitting}
             />
           </div>
           <div className="grid gap-2">
@@ -129,6 +133,7 @@ export function RegisterCard() {
               autoComplete="username"
               placeholder="ganamos.cajero"
               required
+              disabled={isSubmitting}
             />
           </div>
           <div className="grid gap-2">
@@ -145,6 +150,7 @@ export function RegisterCard() {
               autoComplete="new-password"
               placeholder="Creá una contraseña segura"
               required
+              disabled={isSubmitting}
             />
           </div>
           <div className="space-y-3 text-xs text-muted-foreground">
@@ -153,6 +159,7 @@ export function RegisterCard() {
                 type="checkbox"
                 required
                 className="mt-1 size-4 rounded border border-input"
+                disabled={isSubmitting}
               />
               <span>
                 Acepto los{" "}

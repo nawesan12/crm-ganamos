@@ -1,11 +1,11 @@
-// app/(auth)/login/login-card.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 
+import { loginAction } from "@/actions/login";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,16 +16,23 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
-import { loginAction } from "../../actions/login";
+import { getDashboardRouteForRole } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth-store";
 
 export function LoginCard() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.replace(getDashboardRouteForRole(user.role));
+    }
+  }, [isAuthenticated, router, user]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -43,14 +50,8 @@ export function LoginCard() {
         return;
       }
 
-      // Guardamos el usuario en el store global
       login(result.user);
-
-      if (result.user.role === "ADMIN") {
-        router.push("/admin");
-      } else {
-        router.push("/cashier");
-      }
+      router.replace(getDashboardRouteForRole(result.user.role));
     } catch (err) {
       console.error(err);
       setError("Ocurrió un error al iniciar sesión. Intentá de nuevo.");
@@ -79,10 +80,11 @@ export function LoginCard() {
             </label>
             <Input
               id="username"
-              name="username" // 👈 importante para FormData
+              name="username"
               autoComplete="username"
               placeholder="ganamos.cajero"
               required
+              disabled={isSubmitting}
             />
           </div>
           <div className="grid gap-2">
@@ -97,11 +99,12 @@ export function LoginCard() {
             </div>
             <Input
               id="password"
-              name="password" // 👈 importante para FormData
+              name="password"
               type="password"
               autoComplete="current-password"
               placeholder="••••••••"
               required
+              disabled={isSubmitting}
             />
           </div>
 
