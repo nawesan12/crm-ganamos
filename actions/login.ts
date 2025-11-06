@@ -37,10 +37,10 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     where: { username },
   });
 
-  if (!dbUser) {
+  if (!dbUser || !dbUser.isActive) {
     return {
       success: false,
-      error: "No encontramos un usuario con esas credenciales.",
+      error: "No encontramos un usuario activo con esas credenciales.",
     };
   }
 

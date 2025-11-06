@@ -1,9 +1,8 @@
-// app/(auth)/register/actions.ts
 "use server";
+
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 
-// Mantener en sync con tu enum UserRole de Prisma
 export type AuthRole = "ADMIN" | "CASHIER" | "AGENT";
 
 export type RegisterUserPayload = {
@@ -38,7 +37,25 @@ export async function registerAction(
     };
   }
 
+  if (password.length < 6) {
+    return {
+      success: false,
+      error: "La contraseña debe tener al menos 6 caracteres.",
+    };
+  }
+
   const fullName = `${firstName} ${lastName}`.trim();
+
+  const existingUser = await prisma.user.findUnique({
+    where: { username },
+  });
+
+  if (existingUser) {
+    return {
+      success: false,
+      error: "Ese nombre de usuario ya está en uso. Elegí otro.",
+    };
+  }
 
   try {
     const passwordHash = await hashPassword(password, 10);
@@ -47,8 +64,6 @@ export async function registerAction(
         name: fullName,
         username,
         passwordHash,
-        // role y isActive usan los defaults del schema (CASHIER, true)
-        // Podrías guardar `company` en otra tabla si querés más adelante.
       },
     });
 
@@ -65,6 +80,14 @@ export async function registerAction(
     };
   } catch (error) {
     console.error("Error creating user", error);
+
+    const knownError = error as { code?: string };
+    if (knownError?.code === "P2002") {
+      return {
+        success: false,
+        error: "Ese nombre de usuario ya está en uso. Elegí otro.",
+      };
+    }
 
     return {
       success: false,

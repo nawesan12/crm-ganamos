@@ -3,16 +3,14 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
-  Activity,
   BadgeCheck,
   CalendarPlus,
   CircleDollarSign,
   Clock3,
-  Target,
-  TrendingUp,
   Users,
 } from "lucide-react";
 
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
   Card,
@@ -29,7 +27,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   TeamMemberStatus,
   ClientLifecycleStage,
-  ClientHealthStatus,
   TeamMember,
   ClientAccount,
   getAdminDashboardData,
@@ -49,6 +46,14 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 export default function AdminDashboardPage() {
+  return (
+    <AuthGuard allowedRoles={["ADMIN"]}>
+      <AdminDashboardContent />
+    </AuthGuard>
+  );
+}
+
+function AdminDashboardContent() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [clients, setClients] = useState<ClientAccount[]>([]);
   const [isPending, startTransition] = useTransition();

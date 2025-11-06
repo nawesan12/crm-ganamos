@@ -13,6 +13,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
   Card,
@@ -39,6 +40,14 @@ const coinFormatter = new Intl.NumberFormat("en-US", {
 });
 
 export default function CashierDashboardPage() {
+  return (
+    <AuthGuard allowedRoles={["ADMIN", "CASHIER"]}>
+      <CashierDashboardContent />
+    </AuthGuard>
+  );
+}
+
+function CashierDashboardContent() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [ledger, setLedger] = useState<LedgerMember[]>([]);
