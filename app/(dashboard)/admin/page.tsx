@@ -55,12 +55,14 @@ export default function AdminDashboardPage() {
 
   const [userForm, setUserForm] = useState<{
     name: string;
-    email: string;
+    username: string;
+    password: string;
     role: string;
     status: TeamMemberStatus;
   }>({
     name: "",
-    email: "",
+    username: "",
+    password: "",
     role: "",
     status: "En curso",
   });
@@ -138,9 +140,9 @@ export default function AdminDashboardPage() {
     event.preventDefault();
     setUserMessage(null);
 
-    if (!userForm.name || !userForm.email || !userForm.role) {
+    if (!userForm.name || !userForm.username || !userForm.password || !userForm.role) {
       setUserMessage(
-        "Complete todos los campos obligatorios antes de crear el perfil.",
+        "Completá nombre, usuario, contraseña y rol antes de crear el perfil.",
       );
       return;
     }
@@ -148,13 +150,20 @@ export default function AdminDashboardPage() {
     try {
       const newMember = await addTeamMember({
         name: userForm.name.trim(),
-        email: userForm.email.trim(),
+        username: userForm.username.trim(),
+        password: userForm.password,
         roleLabel: userForm.role.trim(),
         status: userForm.status,
       });
 
       setTeamMembers((prev) => [newMember, ...prev]);
-      setUserForm({ name: "", email: "", role: "", status: "En curso" });
+      setUserForm({
+        name: "",
+        username: "",
+        password: "",
+        role: "",
+        status: "En curso",
+      });
       setUserMessage(`${newMember.name} se agregó al espacio de trabajo.`);
     } catch (error) {
       console.error("Error adding team member", error);
@@ -370,19 +379,41 @@ export default function AdminDashboardPage() {
                 <div className="space-y-2">
                   <label
                     className="text-sm font-medium text-foreground"
-                    htmlFor="email"
+                    htmlFor="username"
                   >
-                    Correo electrónico de trabajo
+                    Nombre de usuario
                   </label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="fernanda@ganamos.mx"
-                    value={userForm.email}
+                    id="username"
+                    autoComplete="username"
+                    placeholder="fernanda.ruiz"
+                    value={userForm.username}
                     onChange={(event) =>
                       setUserForm((prev) => ({
                         ...prev,
-                        email: event.target.value,
+                        username: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium text-foreground"
+                    htmlFor="password"
+                  >
+                    Contraseña temporal
+                  </label>
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="Generá una contraseña segura"
+                    value={userForm.password}
+                    onChange={(event) =>
+                      setUserForm((prev) => ({
+                        ...prev,
+                        password: event.target.value,
                       }))
                     }
                     required
@@ -444,7 +475,8 @@ export default function AdminDashboardPage() {
                   onClick={() => {
                     setUserForm({
                       name: "",
-                      email: "",
+                      username: "",
+                      password: "",
                       role: "",
                       status: "En curso",
                     });
@@ -685,7 +717,7 @@ export default function AdminDashboardPage() {
                   <span className="font-medium text-foreground">
                     {member.name}
                   </span>
-                  <span className="text-muted-foreground">{member.email}</span>
+                  <span className="text-muted-foreground">@{member.username}</span>
                 </div>
                 <span className="text-muted-foreground">{member.role}</span>
                 <span className="text-muted-foreground">

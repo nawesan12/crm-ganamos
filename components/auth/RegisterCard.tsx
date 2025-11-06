@@ -118,17 +118,16 @@ export function RegisterCard() {
           </div>
           <div className="grid gap-2">
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="text-sm font-medium text-foreground"
             >
-              Correo de trabajo
+              Nombre de usuario
             </label>
             <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="tucorreo@empresa.com"
+              id="username"
+              name="username"
+              autoComplete="username"
+              placeholder="ganamos.cajero"
               required
             />
           </div>
