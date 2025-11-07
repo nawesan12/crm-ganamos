@@ -43,10 +43,7 @@ export function AuthGuard({
   const router = useRouter();
   const pathname = usePathname();
   const hydrated = useAuthHydration();
-  const { isAuthenticated, user } = useAuthStore((state) => ({
-    isAuthenticated: state.isAuthenticated,
-    user: state.user,
-  }));
+  const { isAuthenticated, user } = useAuthStore();
 
   useEffect(() => {
     if (!hydrated) return;
