@@ -6,7 +6,7 @@ import {
   ClientStatus,
   PaymentMethod,
   TransactionType,
-} from "@/generated/prisma/enums";
+} from "@/generated/enums";
 
 export type MembershipTier = "Premium" | "Estándar" | "Empresarial";
 

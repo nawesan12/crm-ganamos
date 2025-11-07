@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
-import { TransactionType, UserRole } from "@/generated/prisma/enums";
+import { TransactionType, UserRole } from "@/generated/enums";
 
 // ---- Tipos del dashboard (VIEW MODELS, no son el schema) ----
 
@@ -263,12 +263,11 @@ export async function getAdminDashboardData(): Promise<{
   for (const tx of recentCharges) {
     if (!tx.cashierId) continue;
 
-    const stats =
-      cashierStats.get(tx.cashierId) ?? {
-        totalChargedLast30: 0,
-        chargesLast30: 0,
-        clientsServed: new Set<number>(),
-      };
+    const stats = cashierStats.get(tx.cashierId) ?? {
+      totalChargedLast30: 0,
+      chargesLast30: 0,
+      clientsServed: new Set<number>(),
+    };
 
     if (tx.createdAt >= thirtyDaysAgo) {
       stats.totalChargedLast30 += tx.amount;

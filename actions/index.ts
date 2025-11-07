@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
-import { UserRole } from "../generated/prisma/enums";
+import { UserRole } from "../generated/enums";
 
 const createUserSchema = z.object({
   name: z.string().min(3),
@@ -27,12 +27,10 @@ export async function createUserAction(input: CreateUserInput) {
   });
 }
 
-const updateUserSchema = createUserSchema
-  .omit({ password: true })
-  .extend({
-    id: z.number().int(),
-    password: z.string().min(6).optional(),
-  });
+const updateUserSchema = createUserSchema.omit({ password: true }).extend({
+  id: z.number().int(),
+  password: z.string().min(6).optional(),
+});
 
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 

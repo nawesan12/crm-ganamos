@@ -7,7 +7,7 @@ import {
   PaymentMethod,
   TransactionType,
   ClientStatus,
-} from "../generated/prisma/enums";
+} from "../generated/enums";
 import { z } from "zod";
 /* ----------------------------------------
  * Helpers
