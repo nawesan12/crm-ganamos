@@ -26,6 +26,16 @@ export type TeamMember = {
   lastActive: string; // YYYY-MM-DD
 };
 
+export type CashierSummary = {
+  id: string; // cash-<userId>
+  name: string;
+  username: string;
+  totalChargedLast30: number;
+  chargesLast30: number;
+  clientsServedLast30: number;
+  lastChargeAt?: string;
+};
+
 export type ClientAccount = {
   id: string; // cl-<clientId>
   company: string; // label de UI, derivado de username o del form
@@ -64,6 +74,7 @@ function mapUserRoleToLabel(role: UserRole): string {
 export async function getAdminDashboardData(): Promise<{
   teamMembers: TeamMember[];
   clients: ClientAccount[];
+  cashiers: CashierSummary[];
 }> {
   const now = new Date();
   const thirtyDaysAgo = new Date(now);
@@ -218,9 +229,60 @@ export async function getAdminDashboardData(): Promise<{
     };
   });
 
+  type CashierStats = {
+    lastCharge?: Date;
+    totalChargedLast30: number;
+    chargesLast30: number;
+    clientsServed: Set<number>;
+  };
+
+  const cashierStats = new Map<number, CashierStats>();
+
+  for (const tx of recentCharges) {
+    if (!tx.cashierId) continue;
+
+    const stats =
+      cashierStats.get(tx.cashierId) ?? {
+        totalChargedLast30: 0,
+        chargesLast30: 0,
+        clientsServed: new Set<number>(),
+      };
+
+    if (tx.createdAt >= thirtyDaysAgo) {
+      stats.totalChargedLast30 += tx.amount;
+      stats.chargesLast30 += 1;
+      stats.clientsServed.add(tx.clientId);
+    }
+
+    if (!stats.lastCharge || tx.createdAt > stats.lastCharge) {
+      stats.lastCharge = tx.createdAt;
+    }
+
+    cashierStats.set(tx.cashierId, stats);
+  }
+
+  const cashiers: CashierSummary[] = users
+    .filter((user) => user.role === "CASHIER")
+    .map((cashier) => {
+      const stats = cashierStats.get(cashier.id);
+
+      return {
+        id: `cash-${cashier.id}`,
+        name: cashier.name,
+        username: cashier.username,
+        totalChargedLast30: stats?.totalChargedLast30 ?? 0,
+        chargesLast30: stats?.chargesLast30 ?? 0,
+        clientsServedLast30: stats?.clientsServed.size ?? 0,
+        lastChargeAt: stats?.lastCharge
+          ? stats.lastCharge.toISOString().slice(0, 10)
+          : undefined,
+      };
+    });
+
   return {
     teamMembers,
     clients: clientAccounts,
+    cashiers,
   };
 }
 
@@ -334,4 +396,52 @@ export async function addClientAccount(input: {
   };
 
   return clientAccount;
+}
+
+export async function addCashier(input: {
+  name: string;
+  username: string;
+  password: string;
+}): Promise<{ teamMember: TeamMember; cashier: CashierSummary }> {
+  const { name, username, password } = input;
+
+  if (!name || !username || !password) {
+    throw new Error("Nombre, usuario y contraseña son obligatorios.");
+  }
+
+  const passwordHash = await hashPassword(password);
+
+  const dbUser = await prisma.user.create({
+    data: {
+      name: name.trim(),
+      username: username.trim(),
+      passwordHash,
+      role: "CASHIER",
+      isActive: true,
+    },
+  });
+
+  const now = new Date();
+
+  const teamMember: TeamMember = {
+    id: `tm-${dbUser.id}`,
+    name: dbUser.name,
+    username: dbUser.username,
+    role: mapUserRoleToLabel(dbUser.role),
+    status: "Nuevo ingreso",
+    activeDeals: 0,
+    lastActive: now.toISOString().slice(0, 10),
+  };
+
+  const cashier: CashierSummary = {
+    id: `cash-${dbUser.id}`,
+    name: dbUser.name,
+    username: dbUser.username,
+    totalChargedLast30: 0,
+    chargesLast30: 0,
+    clientsServedLast30: 0,
+    lastChargeAt: undefined,
+  };
+
+  return { teamMember, cashier };
 }
