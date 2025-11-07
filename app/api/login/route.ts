@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import type { AuthRole, AuthUser, LoginResponse } from "@/types/auth";
 
-export const dynamic = "force-dynamic";
-
 export async function POST(request: Request) {
   let payload: unknown;
 
@@ -35,7 +33,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const { username: rawUsername, password: rawPassword } = payload as Record<string, unknown>;
+  const { username: rawUsername, password: rawPassword } = payload as Record<
+    string,
+    unknown
+  >;
   const username = typeof rawUsername === "string" ? rawUsername.trim() : "";
   const password = typeof rawPassword === "string" ? rawPassword : "";
 
