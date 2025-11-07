@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Activity,
   Coins,
+  MessageSquare,
+  Plus,
   Users,
+  Wallet,
 } from "lucide-react";
 
 import { AuthGuard } from "@/components/auth/AuthGuard";
@@ -20,6 +23,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ContactChannel,
   ContactDirection,
@@ -90,6 +100,10 @@ function CrmWorkspaceContent() {
   });
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [isChargeDialogOpen, setIsChargeDialogOpen] = useState(false);
 
   useEffect(() => {
     startTransition(() => {
@@ -135,6 +149,7 @@ function CrmWorkspaceContent() {
           setClients((prev) => [client, ...prev]);
           setNewClient({ username: "", phone: "" });
           setFeedback(`Cliente ${client.username} creado correctamente.`);
+          setIsClientDialogOpen(false);
         })
         .catch((err) => {
           console.error("Error creating client", err);
@@ -169,6 +184,7 @@ function CrmWorkspaceContent() {
             ...prev,
             message: "",
           }));
+          setIsContactDialogOpen(false);
         })
         .catch((err) => {
           console.error("Error logging contact", err);
@@ -217,6 +233,7 @@ function CrmWorkspaceContent() {
             method: PaymentMethod.CASH,
             description: "",
           });
+          setIsChargeDialogOpen(false);
         })
         .catch((err) => {
           console.error("Error registering charge", err);
@@ -226,6 +243,23 @@ function CrmWorkspaceContent() {
   };
 
   const isLoading = isPending && clients.length === 0;
+
+  const closeMenu = () => setIsMenuOpen(false);
+
+  const handleOpenClientDialog = () => {
+    closeMenu();
+    setIsClientDialogOpen(true);
+  };
+
+  const handleOpenContactDialog = () => {
+    closeMenu();
+    setIsContactDialogOpen(true);
+  };
+
+  const handleOpenChargeDialog = () => {
+    closeMenu();
+    setIsChargeDialogOpen(true);
+  };
 
   return (
     <div className="space-y-10">
@@ -275,7 +309,7 @@ function CrmWorkspaceContent() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+      <div className="grid gap-6">
         <Card className="border-border/70 bg-background/90">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-foreground">
@@ -325,289 +359,352 @@ function CrmWorkspaceContent() {
             Datos limitados a los últimos 50 clientes para agilizar la vista.
           </CardFooter>
         </Card>
-
-        <div className="space-y-6">
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-foreground">
-                Registrar nuevo cliente
-              </CardTitle>
-              <CardDescription>
-                Cargá clientes potenciales o jugadores desde tu canal de ventas.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleCreateClient}>
-                <div className="space-y-2">
-                  <label
-                    htmlFor="client-username"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Usuario / Identificador
-                  </label>
-                  <Input
-                    id="client-username"
-                    value={newClient.username}
-                    onChange={(event) =>
-                      setNewClient((prev) => ({
-                        ...prev,
-                        username: event.target.value,
-                      }))
-                    }
-                    placeholder="ej. jugador.123"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="client-phone" className="text-sm font-medium text-foreground">
-                    Teléfono
-                  </label>
-                  <Input
-                    id="client-phone"
-                    value={newClient.phone}
-                    onChange={(event) =>
-                      setNewClient((prev) => ({
-                        ...prev,
-                        phone: event.target.value,
-                      }))
-                    }
-                    placeholder="5491130000000"
-                  />
-                </div>
-                <Button type="submit" disabled={isPending} className="w-full">
-                  Crear cliente
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-foreground">
-                Registrar contacto
-              </CardTitle>
-              <CardDescription>
-                Documentá interacciones clave para mantener el contexto del equipo.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleLogContact}>
-                <div className="space-y-2">
-                  <label
-                    htmlFor="contact-client"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Cliente
-                  </label>
-                  <select
-                    id="contact-client"
-                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    value={contactForm.clientId}
-                    onChange={(event) =>
-                      setContactForm((prev) => ({
-                        ...prev,
-                        clientId: event.target.value,
-                      }))
-                    }
-                    required
-                  >
-                    <option value="" disabled>
-                      Seleccioná un cliente
-                    </option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label htmlFor="contact-channel" className="text-sm font-medium text-foreground">
-                      Canal
-                    </label>
-                    <select
-                      id="contact-channel"
-                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                      value={contactForm.channel}
-                      onChange={(event) =>
-                        setContactForm((prev) => ({
-                          ...prev,
-                          channel: event.target.value as ContactChannel,
-                        }))
-                      }
-                    >
-                      {Object.values(ContactChannel).map((channel) => (
-                        <option key={channel} value={channel}>
-                          {channel.toLowerCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="contact-direction" className="text-sm font-medium text-foreground">
-                      Dirección
-                    </label>
-                    <select
-                      id="contact-direction"
-                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                      value={contactForm.direction}
-                      onChange={(event) =>
-                        setContactForm((prev) => ({
-                          ...prev,
-                          direction: event.target.value as ContactDirection,
-                        }))
-                      }
-                    >
-                      {Object.values(ContactDirection).map((direction) => (
-                        <option key={direction} value={direction}>
-                          {direction.toLowerCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={contactForm.viaAd}
-                      onChange={(event) =>
-                        setContactForm((prev) => ({
-                          ...prev,
-                          viaAd: event.target.checked,
-                        }))
-                      }
-                      className="size-4 rounded border border-input"
-                    />
-                    ¿El contacto llegó desde una campaña?
-                  </label>
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="contact-message" className="text-sm font-medium text-foreground">
-                    Notas
-                  </label>
-                  <Textarea
-                    id="contact-message"
-                    value={contactForm.message}
-                    onChange={(event) =>
-                      setContactForm((prev) => ({
-                        ...prev,
-                        message: event.target.value,
-                      }))
-                    }
-                    placeholder="Detalle breve de la conversación"
-                  />
-                </div>
-                <Button type="submit" disabled={isPending} className="w-full">
-                  Guardar contacto
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-foreground">
-                Acreditar puntos
-              </CardTitle>
-              <CardDescription>
-                Actualizá el saldo del cliente directamente desde la gestión comercial.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={handleRegisterCharge}>
-                <div className="space-y-2">
-                  <label htmlFor="charge-client" className="text-sm font-medium text-foreground">
-                    Cliente
-                  </label>
-                  <select
-                    id="charge-client"
-                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    value={chargeForm.clientId}
-                    onChange={(event) =>
-                      setChargeForm((prev) => ({
-                        ...prev,
-                        clientId: event.target.value,
-                      }))
-                    }
-                    required
-                  >
-                    <option value="" disabled>
-                      Seleccioná un cliente
-                    </option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="charge-amount" className="text-sm font-medium text-foreground">
-                    Monto (puntos)
-                  </label>
-                  <Input
-                    id="charge-amount"
-                    type="number"
-                    min={1}
-                    value={chargeForm.amount}
-                    onChange={(event) =>
-                      setChargeForm((prev) => ({
-                        ...prev,
-                        amount: event.target.value,
-                      }))
-                    }
-                    placeholder="500"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="charge-method" className="text-sm font-medium text-foreground">
-                    Medio de pago
-                  </label>
-                  <select
-                    id="charge-method"
-                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    value={chargeForm.method}
-                    onChange={(event) =>
-                      setChargeForm((prev) => ({
-                        ...prev,
-                        method: event.target.value as PaymentMethod,
-                      }))
-                    }
-                  >
-                    {Object.values(PaymentMethod).map((method) => (
-                      <option key={method} value={method}>
-                        {method.toLowerCase()}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="charge-description" className="text-sm font-medium text-foreground">
-                    Nota interna
-                  </label>
-                  <Textarea
-                    id="charge-description"
-                    value={chargeForm.description}
-                    onChange={(event) =>
-                      setChargeForm((prev) => ({
-                        ...prev,
-                        description: event.target.value,
-                      }))
-                    }
-                    placeholder="Detalle opcional de la acreditación"
-                  />
-                </div>
-                <Button type="submit" disabled={isPending} className="w-full">
-                  Registrar acreditación
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
       </div>
+
+      <Card className="border-border/70 bg-background/90">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-foreground">
+            Centro de acciones rápidas
+          </CardTitle>
+          <CardDescription>
+            Usá el menú flotante para registrar clientes, contactos y acreditaciones sin
+            perder de vista los datos del tablero.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <p>
+            El botón con el ícono <Plus className="inline size-4 align-text-top" /> aparece en la esquina
+            inferior derecha. Al pulsarlo se despliegan las acciones disponibles. Seleccioná la que
+            necesites y completá el formulario en un diálogo optimizado para cada tarea.
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <span className="font-medium text-foreground">Registrar nuevo cliente</span>: crea fichas
+              en segundos y mantené actualizado el pipeline comercial.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Registrar contacto</span>: documentá
+              interacciones relevantes para todo el equipo.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Acreditar puntos</span>: actualizá el saldo
+              de los clientes autorizados sin salir del tablero.
+            </li>
+          </ul>
+          <p>
+            Podés cerrar los diálogos con la tecla <kbd className="rounded border bg-muted px-1">Esc</kbd> o con el
+            botón de cierre sin perder el contexto actual.
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        {isMenuOpen ? (
+          <div className="w-64 space-y-2 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-xl shadow-black/10 backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Acciones rápidas
+            </p>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary"
+              onClick={handleOpenClientDialog}
+            >
+              <Users className="size-4" /> Registrar nuevo cliente
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary"
+              onClick={handleOpenContactDialog}
+            >
+              <MessageSquare className="size-4" /> Registrar contacto
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary"
+              onClick={handleOpenChargeDialog}
+            >
+              <Wallet className="size-4" /> Acreditar puntos
+            </Button>
+          </div>
+        ) : null}
+
+        <Button
+          size="lg"
+          className="h-14 w-14 rounded-full shadow-lg shadow-primary/30"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+          aria-label={isMenuOpen ? "Cerrar menú de acciones" : "Abrir menú de acciones"}
+        >
+          <Plus className={`size-6 transition-transform ${isMenuOpen ? "rotate-45" : ""}`} />
+        </Button>
+      </div>
+
+      <Dialog open={isClientDialogOpen} onOpenChange={setIsClientDialogOpen}>
+        <DialogContent className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar nuevo cliente</DialogTitle>
+            <DialogDescription>
+              Cargá clientes potenciales o jugadores desde tu canal de ventas.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleCreateClient}>
+            <div className="space-y-2">
+              <label htmlFor="client-username" className="text-sm font-medium text-foreground">
+                Usuario / Identificador
+              </label>
+              <Input
+                id="client-username"
+                value={newClient.username}
+                onChange={(event) =>
+                  setNewClient((prev) => ({
+                    ...prev,
+                    username: event.target.value,
+                  }))
+                }
+                placeholder="ej. jugador.123"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="client-phone" className="text-sm font-medium text-foreground">
+                Teléfono
+              </label>
+              <Input
+                id="client-phone"
+                value={newClient.phone}
+                onChange={(event) =>
+                  setNewClient((prev) => ({
+                    ...prev,
+                    phone: event.target.value,
+                  }))
+                }
+                placeholder="5491130000000"
+              />
+            </div>
+            <Button type="submit" disabled={isPending} className="w-full">
+              Crear cliente
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+        <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar contacto</DialogTitle>
+            <DialogDescription>
+              Documentá interacciones clave para mantener el contexto del equipo.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleLogContact}>
+            <div className="space-y-2">
+              <label htmlFor="contact-client" className="text-sm font-medium text-foreground">
+                Cliente
+              </label>
+              <select
+                id="contact-client"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                value={contactForm.clientId}
+                onChange={(event) =>
+                  setContactForm((prev) => ({
+                    ...prev,
+                    clientId: event.target.value,
+                  }))
+                }
+                required
+              >
+                <option value="" disabled>
+                  Seleccioná un cliente
+                </option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="contact-channel" className="text-sm font-medium text-foreground">
+                  Canal
+                </label>
+                <select
+                  id="contact-channel"
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  value={contactForm.channel}
+                  onChange={(event) =>
+                    setContactForm((prev) => ({
+                      ...prev,
+                      channel: event.target.value as ContactChannel,
+                    }))
+                  }
+                >
+                  {Object.values(ContactChannel).map((channel) => (
+                    <option key={channel} value={channel}>
+                      {channel.toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="contact-direction" className="text-sm font-medium text-foreground">
+                  Dirección
+                </label>
+                <select
+                  id="contact-direction"
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  value={contactForm.direction}
+                  onChange={(event) =>
+                    setContactForm((prev) => ({
+                      ...prev,
+                      direction: event.target.value as ContactDirection,
+                    }))
+                  }
+                >
+                  {Object.values(ContactDirection).map((direction) => (
+                    <option key={direction} value={direction}>
+                      {direction.toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  checked={contactForm.viaAd}
+                  onChange={(event) =>
+                    setContactForm((prev) => ({
+                      ...prev,
+                      viaAd: event.target.checked,
+                    }))
+                  }
+                  className="size-4 rounded border border-input"
+                />
+                ¿El contacto llegó desde una campaña?
+              </label>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="contact-message" className="text-sm font-medium text-foreground">
+                Notas
+              </label>
+              <Textarea
+                id="contact-message"
+                value={contactForm.message}
+                onChange={(event) =>
+                  setContactForm((prev) => ({
+                    ...prev,
+                    message: event.target.value,
+                  }))
+                }
+                placeholder="Detalle breve de la conversación"
+              />
+            </div>
+            <Button type="submit" disabled={isPending} className="w-full">
+              Guardar contacto
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isChargeDialogOpen} onOpenChange={setIsChargeDialogOpen}>
+        <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Acreditar puntos</DialogTitle>
+            <DialogDescription>
+              Actualizá el saldo del cliente directamente desde la gestión comercial.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleRegisterCharge}>
+            <div className="space-y-2">
+              <label htmlFor="charge-client" className="text-sm font-medium text-foreground">
+                Cliente
+              </label>
+              <select
+                id="charge-client"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                value={chargeForm.clientId}
+                onChange={(event) =>
+                  setChargeForm((prev) => ({
+                    ...prev,
+                    clientId: event.target.value,
+                  }))
+                }
+                required
+              >
+                <option value="" disabled>
+                  Seleccioná un cliente
+                </option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="charge-amount" className="text-sm font-medium text-foreground">
+                Monto (puntos)
+              </label>
+              <Input
+                id="charge-amount"
+                type="number"
+                min={1}
+                value={chargeForm.amount}
+                onChange={(event) =>
+                  setChargeForm((prev) => ({
+                    ...prev,
+                    amount: event.target.value,
+                  }))
+                }
+                placeholder="500"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="charge-method" className="text-sm font-medium text-foreground">
+                Medio de pago
+              </label>
+              <select
+                id="charge-method"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                value={chargeForm.method}
+                onChange={(event) =>
+                  setChargeForm((prev) => ({
+                    ...prev,
+                    method: event.target.value as PaymentMethod,
+                  }))
+                }
+              >
+                {Object.values(PaymentMethod).map((method) => (
+                  <option key={method} value={method}>
+                    {method.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="charge-description" className="text-sm font-medium text-foreground">
+                Nota interna
+              </label>
+              <Textarea
+                id="charge-description"
+                value={chargeForm.description}
+                onChange={(event) =>
+                  setChargeForm((prev) => ({
+                    ...prev,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder="Detalle opcional de la acreditación"
+              />
+            </div>
+            <Button type="submit" disabled={isPending} className="w-full">
+              Registrar acreditación
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
