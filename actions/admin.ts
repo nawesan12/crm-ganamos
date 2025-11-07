@@ -49,6 +49,20 @@ export type ClientAccount = {
   notes?: string;
 };
 
+export type AdminDashboardMetrics = {
+  totalMonthlyValue: number;
+  previousMonthlyValue: number;
+  onboardingCount: number;
+  onboardingPipelineValue: number;
+  newClientsLast30: number;
+  newClientsPrev30: number;
+  healthyCount: number;
+  totalClients: number;
+  avgOnboardingTime: number;
+  fastestOnboardingTime: number | null;
+  slowestOnboardingTime: number | null;
+};
+
 // ---- Helpers ----
 
 function diffDays(a: Date, b: Date) {
@@ -75,10 +89,13 @@ export async function getAdminDashboardData(): Promise<{
   teamMembers: TeamMember[];
   clients: ClientAccount[];
   cashiers: CashierSummary[];
+  metrics: AdminDashboardMetrics;
 }> {
   const now = new Date();
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(now.getDate() - 30);
+  const sixtyDaysAgo = new Date(now);
+  sixtyDaysAgo.setDate(now.getDate() - 60);
   const ninetyDaysAgo = new Date(now);
   ninetyDaysAgo.setDate(now.getDate() - 90);
 
@@ -104,6 +121,7 @@ export async function getAdminDashboardData(): Promise<{
   type ClientStats = {
     lastChargeAt?: Date;
     totalChargedLast30: number;
+    totalChargedPrev30: number;
     lastInteractionAt?: Date;
   };
 
@@ -112,6 +130,7 @@ export async function getAdminDashboardData(): Promise<{
   for (const tx of recentCharges) {
     const stats = clientStats.get(tx.clientId) ?? {
       totalChargedLast30: 0,
+      totalChargedPrev30: 0,
     };
 
     if (!stats.lastChargeAt || tx.createdAt > stats.lastChargeAt) {
@@ -120,6 +139,8 @@ export async function getAdminDashboardData(): Promise<{
 
     if (tx.createdAt >= thirtyDaysAgo) {
       stats.totalChargedLast30 += tx.amount;
+    } else if (tx.createdAt >= sixtyDaysAgo) {
+      stats.totalChargedPrev30 += tx.amount;
     }
 
     if (!stats.lastInteractionAt || tx.createdAt > stats.lastInteractionAt) {
@@ -132,6 +153,7 @@ export async function getAdminDashboardData(): Promise<{
   for (const contact of recentContacts) {
     const stats = clientStats.get(contact.clientId) ?? {
       totalChargedLast30: 0,
+      totalChargedPrev30: 0,
     };
 
     if (
@@ -279,10 +301,68 @@ export async function getAdminDashboardData(): Promise<{
       };
     });
 
+  let previousMonthlyValue = 0;
+  for (const stats of clientStats.values()) {
+    previousMonthlyValue += stats.totalChargedPrev30 ?? 0;
+  }
+
+  const onboardingClients = clientAccounts.filter(
+    (client) => client.stage === "Incorporación",
+  );
+  const onboardingPipelineValue = onboardingClients.reduce(
+    (acc, client) => acc + client.monthlyValue,
+    0,
+  );
+  const totalMonthlyValue = clientAccounts.reduce(
+    (acc, client) => acc + client.monthlyValue,
+    0,
+  );
+  const totalClients = clientAccounts.length;
+  const healthyCount = clientAccounts.filter(
+    (client) => client.health === "Saludable",
+  ).length;
+  const avgOnboardingTime =
+    totalClients > 0
+      ? Math.round(
+          clientAccounts.reduce(
+            (acc, client) => acc + client.onboardingDays,
+            0,
+          ) / totalClients,
+        )
+      : 0;
+
+  const onboardingDays = clientAccounts.map((client) => client.onboardingDays);
+  const fastestOnboardingTime =
+    onboardingDays.length > 0 ? Math.min(...onboardingDays) : null;
+  const slowestOnboardingTime =
+    onboardingDays.length > 0 ? Math.max(...onboardingDays) : null;
+
+  const newClientsLast30 = clientAccounts.filter(
+    (client) => client.onboardingDays <= 30,
+  ).length;
+  const newClientsPrev30 = clientAccounts.filter(
+    (client) => client.onboardingDays > 30 && client.onboardingDays <= 60,
+  ).length;
+
+  const metrics: AdminDashboardMetrics = {
+    totalMonthlyValue,
+    previousMonthlyValue,
+    onboardingCount: onboardingClients.length,
+    onboardingPipelineValue,
+    newClientsLast30,
+    newClientsPrev30,
+    healthyCount,
+    totalClients,
+    avgOnboardingTime,
+    fastestOnboardingTime,
+    slowestOnboardingTime,
+  };
+
   return {
     teamMembers,
     clients: clientAccounts,
     cashiers,
+    metrics,
   };
 }
 

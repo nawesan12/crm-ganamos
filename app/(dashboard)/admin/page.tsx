@@ -30,6 +30,7 @@ import {
   TeamMember,
   ClientAccount,
   CashierSummary,
+  AdminDashboardMetrics,
   getAdminDashboardData,
   addTeamMember,
   addClientAccount,
@@ -63,6 +64,8 @@ function AdminDashboardContent() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [clients, setClients] = useState<ClientAccount[]>([]);
   const [cashiers, setCashiers] = useState<CashierSummary[]>([]);
+  const [dashboardMetrics, setDashboardMetrics] =
+    useState<AdminDashboardMetrics | null>(null);
   const [isLoadingDashboard, startTransition] = useTransition();
   const [isCreatingCashier, startCashierTransition] = useTransition();
 
@@ -116,6 +119,7 @@ function AdminDashboardContent() {
           setTeamMembers(data.teamMembers);
           setClients(data.clients);
           setCashiers(data.cashiers);
+          setDashboardMetrics(data.metrics);
         })
         .catch((error) => {
           console.error("Error loading admin dashboard data", error);
@@ -131,31 +135,112 @@ function AdminDashboardContent() {
     [clients],
   );
 
-  const metrics = useMemo(() => {
+  const clientMetrics = useMemo(() => {
     const totalMonthlyValue = clients.reduce(
       (acc, client) => acc + client.monthlyValue,
       0,
     );
-    const onboardingCount = clients.filter(
+
+    const onboardingClients = clients.filter(
       (client) => client.stage === "Incorporación",
+    );
+    const onboardingPipelineValue = onboardingClients.reduce(
+      (acc, client) => acc + client.monthlyValue,
+      0,
+    );
+
+    const totalClients = clients.length;
+    const healthyCount = clients.filter(
+      (client) => client.health === "Saludable",
     ).length;
-    const healthyRatio = Math.round(
-      (clients.filter((client) => client.health === "Saludable").length /
-        Math.max(clients.length, 1)) *
-        100,
-    );
-    const avgOnboardingTime = Math.round(
-      clients.reduce((acc, client) => acc + client.onboardingDays, 0) /
-        Math.max(clients.length, 1),
-    );
+
+    const avgOnboardingTime =
+      totalClients > 0
+        ? Math.round(
+            clients.reduce((acc, client) => acc + client.onboardingDays, 0) /
+              totalClients,
+          )
+        : 0;
+
+    const onboardingDays = clients.map((client) => client.onboardingDays);
+    const fastestOnboarding =
+      onboardingDays.length > 0 ? Math.min(...onboardingDays) : null;
+    const slowestOnboarding =
+      onboardingDays.length > 0 ? Math.max(...onboardingDays) : null;
+
+    const newClientsLast30 = clients.filter(
+      (client) => client.onboardingDays <= 30,
+    ).length;
+    const newClientsPrev30 = clients.filter(
+      (client) => client.onboardingDays > 30 && client.onboardingDays <= 60,
+    ).length;
 
     return {
       totalMonthlyValue,
-      onboardingCount,
-      healthyRatio,
+      onboardingCount: onboardingClients.length,
+      onboardingPipelineValue,
+      totalClients,
+      healthyCount,
       avgOnboardingTime,
+      fastestOnboarding,
+      slowestOnboarding,
+      newClientsLast30,
+      newClientsPrev30,
     };
   }, [clients]);
+
+  const totalMonthlyValue = clientMetrics.totalMonthlyValue;
+  const previousMonthlyValue = dashboardMetrics?.previousMonthlyValue ?? 0;
+  const monthlyChange = totalMonthlyValue - previousMonthlyValue;
+  const monthlyTrendDirection =
+    monthlyChange > 0 ? "up" : monthlyChange < 0 ? "down" : "neutral";
+  const monthlyTrendValue = dashboardMetrics
+    ? monthlyChange === 0
+      ? "Sin variación vs 30d previos"
+      : `${monthlyChange > 0 ? "▲" : "▼"} ${currency.format(Math.abs(monthlyChange))} vs 30d previos`
+    : "Sin datos disponibles";
+
+  const onboardingCount = clientMetrics.onboardingCount;
+  const onboardingPipelineValue = clientMetrics.onboardingPipelineValue;
+  const newClientsLast30 = clientMetrics.newClientsLast30;
+  const newClientsPrev30 = clientMetrics.newClientsPrev30;
+  const onboardingTrendDelta = newClientsLast30 - newClientsPrev30;
+  const onboardingTrendDirection =
+    onboardingTrendDelta > 0
+      ? "up"
+      : onboardingTrendDelta < 0
+        ? "down"
+        : "neutral";
+  const onboardingTrendValue = `${newClientsLast30} en 30d • ${newClientsPrev30} previos`;
+
+  const healthyCount = clientMetrics.healthyCount;
+  const totalClientsCount = clientMetrics.totalClients;
+  const healthyRatio =
+    totalClientsCount > 0
+      ? Math.round((healthyCount / totalClientsCount) * 100)
+      : 0;
+  const atRiskCount = Math.max(totalClientsCount - healthyCount, 0);
+  const healthTrendDirection =
+    totalClientsCount === 0
+      ? "neutral"
+      : healthyRatio >= 86
+        ? "up"
+        : "down";
+  const healthTrendValue = `${healthyCount} saludables / ${atRiskCount} con seguimiento`;
+
+  const avgOnboardingTime = clientMetrics.avgOnboardingTime;
+  const fastestOnboarding = clientMetrics.fastestOnboarding;
+  const slowestOnboarding = clientMetrics.slowestOnboarding;
+  const onboardingRangeLabel =
+    fastestOnboarding !== null && slowestOnboarding !== null
+      ? `Rango: ${fastestOnboarding}d - ${slowestOnboarding}d`
+      : "Sin registros históricos";
+  const onboardingSpeedDirection =
+    avgOnboardingTime === 0
+      ? "neutral"
+      : avgOnboardingTime <= 14
+        ? "up"
+        : "down";
 
   const sortedCashiers = useMemo(() => {
     return [...cashiers].sort((a, b) => {
@@ -311,38 +396,39 @@ function AdminDashboardContent() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="Ingresos recurrentes mensuales"
-          value={currency.format(metrics.totalMonthlyValue)}
+          value={currency.format(totalMonthlyValue)}
           icon={<CircleDollarSign className="size-5" />}
-          trendLabel="Últimos 30 días"
-          trendValue="▲ 12% vs ciclo anterior"
-          trendDirection="up"
-          description="Suma de todos los contratos de suscripción activos"
+          trendLabel="Comparación con 30d previos"
+          trendValue={monthlyTrendValue}
+          trendDirection={monthlyTrendDirection}
+          description="Cargos procesados durante los últimos 30 días"
         />
         <MetricCard
           title="Incorporaciones activas"
-          value={`${metrics.onboardingCount}`}
+          value={`${onboardingCount}`}
           icon={<CalendarPlus className="size-5" />}
-          trendLabel="Equipos por lanzar"
-          trendValue="3 inicios programados"
-          description="Clientes en etapa de incorporación"
+          trendLabel="Nuevos clientes (30d)"
+          trendValue={onboardingTrendValue}
+          trendDirection={onboardingTrendDirection}
+          description={`Clientes en incorporación activa • Pipeline ${currency.format(onboardingPipelineValue)}`}
         />
         <MetricCard
           title="Cuentas saludables"
-          value={`${metrics.healthyRatio}%`}
+          value={`${healthyRatio}%`}
           icon={<BadgeCheck className="size-5" />}
-          trendLabel="Salud del cliente"
-          trendValue="Objetivo del 86%"
-          trendDirection={metrics.healthyRatio >= 86 ? "up" : "down"}
-          description="Cuentas marcadas en verde durante la última revisión"
+          trendLabel="Distribución actual"
+          trendValue={healthTrendValue}
+          trendDirection={healthTrendDirection}
+          description="Cuentas marcadas como saludables según actividad reciente"
         />
         <MetricCard
           title="Tiempo promedio de puesta en marcha"
-          value={`${metrics.avgOnboardingTime} días`}
+          value={`${avgOnboardingTime} días`}
           icon={<Clock3 className="size-5" />}
-          trendLabel="Desde la firma hasta la activación"
-          trendValue="Objetivo: < 14 días"
-          trendDirection={metrics.avgOnboardingTime <= 14 ? "up" : "down"}
-          description="Seguimiento de la eficiencia de la implementación en todas las cuentas"
+          trendLabel="Historial de implementación"
+          trendValue={onboardingRangeLabel}
+          trendDirection={onboardingSpeedDirection}
+          description="Seguimiento de la eficiencia desde la creación hasta la activación (objetivo: < 14 días)"
         />
       </div>
 
