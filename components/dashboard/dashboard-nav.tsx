@@ -71,18 +71,18 @@ export function DashboardNav() {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-30 border-b border-primary/20 bg-gradient-to-r from-[#3b1d68]/80 via-[#2d1559]/80 to-[#24124a]/80 text-primary-foreground backdrop-blur supports-[backdrop-filter]:bg-[#1c0d38]/60">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
         <Link
           href="/"
-          className="flex items-center gap-2 text-sm font-semibold tracking-tight"
+          className="flex items-center gap-2 text-sm font-semibold tracking-tight text-primary-foreground"
         >
-          <span className="grid size-9 place-items-center rounded-lg border border-border bg-primary/10 text-lg text-primary">
+          <span className="grid size-9 place-items-center rounded-lg border border-primary/30 bg-gradient-to-br from-primary/90 via-primary to-[#5b21b6] text-lg font-bold text-primary-foreground shadow shadow-primary/30">
             G
           </span>
           <div className="flex flex-col leading-tight">
-            <span>CRM Ganamos</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-primary-foreground">CRM Ganamos</span>
+            <span className="text-xs font-normal text-primary-foreground/70">
               Paneles de operaciones
             </span>
           </div>
@@ -97,10 +97,10 @@ export function DashboardNav() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "rounded-full px-4 py-2 text-sm transition",
+                    "rounded-full px-4 py-2 text-sm font-medium transition",
                     active
-                      ? "bg-primary text-primary-foreground shadow"
-                      : "text-muted-foreground hover:bg-muted/60",
+                      ? "bg-gradient-to-r from-primary via-[#8147f0] to-[#6d28d9] text-primary-foreground shadow-lg shadow-primary/30"
+                      : "text-primary-foreground/70 hover:bg-primary/15 hover:text-primary-foreground",
                   )}
                 >
                   {item.label}
@@ -115,8 +115,10 @@ export function DashboardNav() {
         <div className="flex items-center gap-3">
           {hydrated && user ? (
             <div className="hidden flex-col items-end text-right text-xs sm:flex">
-              <span className="font-medium text-foreground">{user.name}</span>
-              <span className="text-muted-foreground capitalize">
+              <span className="font-medium text-primary-foreground">
+                {user.name}
+              </span>
+              <span className="text-primary-foreground/70 capitalize">
                 {user.role.toLowerCase()}
               </span>
             </div>
@@ -125,7 +127,7 @@ export function DashboardNav() {
           <Button
             variant="ghost"
             size="icon"
-            className="hidden md:inline-flex"
+            className="hidden text-primary-foreground hover:bg-primary/20 md:inline-flex"
             onClick={handleLogout}
           >
             <LogOut className="size-5" />
@@ -134,21 +136,28 @@ export function DashboardNav() {
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
+              <Button
+                variant="outline"
+                size="icon"
+                className="border-primary/40 bg-primary/10 text-primary-foreground hover:bg-primary/20 md:hidden"
+              >
                 <Menu className="size-5" />
                 <span className="sr-only">Abrir navegación</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-72">
+            <SheetContent
+              side="right"
+              className="w-72 border-l border-primary/20 bg-gradient-to-b from-[#f5f0ff] to-[#efe1ff] text-foreground dark:from-[#1c0d38] dark:to-[#0f051f] dark:text-primary-foreground"
+            >
               <div className="mt-8 flex flex-col gap-4">
                 {hydrated && user ? (
-                  <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-muted/40 p-4">
-                    <UserCircle className="size-10 text-muted-foreground" />
-                    <div className="flex flex-col text-sm">
-                      <span className="font-medium text-foreground">
+                  <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/15 to-transparent p-4 text-primary-foreground">
+                    <UserCircle className="size-10 text-primary-foreground/80" />
+                    <div className="flex flex-col text-sm text-left">
+                      <span className="font-medium text-primary-foreground">
                         {user.name}
                       </span>
-                      <span className="text-muted-foreground capitalize">
+                      <span className="text-primary-foreground/70 capitalize">
                         {user.role.toLowerCase()}
                       </span>
                     </div>
@@ -165,10 +174,10 @@ export function DashboardNav() {
                           href={item.href}
                           onClick={() => setOpen(false)}
                           className={cn(
-                            "rounded-lg px-3 py-2 text-sm transition",
+                            "rounded-lg px-3 py-2 text-sm font-medium transition",
                             active
-                              ? "bg-primary text-primary-foreground"
-                              : "text-muted-foreground hover:bg-muted/60",
+                              ? "bg-gradient-to-r from-primary via-[#8147f0] to-[#6d28d9] text-primary-foreground shadow shadow-primary/30"
+                              : "text-foreground/80 hover:bg-primary/15 hover:text-foreground dark:text-primary-foreground/70 dark:hover:text-primary-foreground",
                           )}
                         >
                           {item.label}
@@ -178,7 +187,11 @@ export function DashboardNav() {
                   </nav>
                 ) : null}
 
-                <Button variant="outline" className="justify-start" onClick={handleLogout}>
+                <Button
+                  variant="outline"
+                  className="justify-start border-primary/30 bg-primary/10 text-foreground hover:bg-primary/20 dark:text-primary-foreground"
+                  onClick={handleLogout}
+                >
                   <LogOut className="mr-2 size-4" /> Cerrar sesión
                 </Button>
               </div>
