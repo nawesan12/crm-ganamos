@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 
 export async function hashPassword(
   password: string,
-  cost = 10,
+  cost = 12,
 ): Promise<string> {
   if (!password) {
     throw new Error("La contraseña no puede estar vacía.");
