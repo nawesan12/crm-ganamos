@@ -7,8 +7,8 @@ import { getDashboardRouteForRole } from "@/lib/auth";
 import { AuthRole, useAuthStore } from "@/stores/auth-store";
 
 function useAuthHydration() {
-  const [hydrated, setHydrated] = useState(() =>
-    useAuthStore.persist?.hasHydrated?.() ?? false,
+  const [hydrated, setHydrated] = useState(
+    () => useAuthStore.persist?.hasHydrated?.() ?? false,
   );
 
   useEffect(() => {
@@ -64,7 +64,9 @@ export function AuthGuard({
   if (!hydrated) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
-        <p className="text-sm text-muted-foreground">Preparando tu espacio...</p>
+        <p className="text-sm text-muted-foreground">
+          Preparando tu espacio...
+        </p>
       </div>
     );
   }
