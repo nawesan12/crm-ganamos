@@ -21,9 +21,9 @@ import { useAuthStore } from "@/stores/auth-store";
 
 export function LoginCard() {
   const router = useRouter();
-  const login = useAuthStore((state) => state.login);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const user = useAuthStore((state) => state.user);
+  const { login } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
+  const { user } = useAuthStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
