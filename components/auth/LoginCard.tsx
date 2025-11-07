@@ -60,8 +60,18 @@ export function LoginCard() {
 
       const result = (await response.json()) as LoginResponse;
 
-      if (!response.ok || !result.success) {
-        setError(result.error ?? "No pudimos iniciar sesión. Intentá de nuevo.");
+      if (!response.ok) {
+        const errorMessage =
+          !result.success && "error" in result
+            ? result.error
+            : "No pudimos iniciar sesión. Intentá de nuevo.";
+        setError(errorMessage);
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!result.success) {
+        setError(result.error);
         setIsSubmitting(false);
         return;
       }
