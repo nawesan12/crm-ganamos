@@ -34,7 +34,7 @@ import {
   ContactChannel,
   ContactDirection,
   PaymentMethod,
-} from "@/generated/prisma/enums";
+} from "@/generated/enums";
 import { listClientsAction } from "@/actions";
 import {
   createClientAction,
@@ -56,7 +56,9 @@ export default function CrmWorkspacePage() {
   );
 }
 
-type ClientRecord = Awaited<ReturnType<typeof listClientsAction>>["clients"][number];
+type ClientRecord = Awaited<
+  ReturnType<typeof listClientsAction>
+>["clients"][number];
 
 type NewClientForm = {
   username: string;
@@ -120,8 +122,13 @@ function CrmWorkspaceContent() {
 
   const metrics = useMemo(() => {
     const total = clients.length;
-    const active = clients.filter((client) => client.status === "ACTIVE").length;
-    const balance = clients.reduce((acc, client) => acc + client.pointsBalance, 0);
+    const active = clients.filter(
+      (client) => client.status === "ACTIVE",
+    ).length;
+    const balance = clients.reduce(
+      (acc, client) => acc + client.pointsBalance,
+      0,
+    );
 
     return {
       total,
@@ -153,7 +160,9 @@ function CrmWorkspaceContent() {
         })
         .catch((err) => {
           console.error("Error creating client", err);
-          setError("No se pudo crear el cliente. Revisá que el usuario sea único.");
+          setError(
+            "No se pudo crear el cliente. Revisá que el usuario sea único.",
+          );
         });
     });
   };
@@ -223,7 +232,9 @@ function CrmWorkspaceContent() {
         .then(({ client }) => {
           setClients((prev) =>
             prev.map((item) =>
-              item.id === client.id ? { ...item, pointsBalance: client.pointsBalance } : item,
+              item.id === client.id
+                ? { ...item, pointsBalance: client.pointsBalance }
+                : item,
             ),
           );
           setFeedback("Carga registrada y saldo actualizado.");
@@ -271,7 +282,8 @@ function CrmWorkspaceContent() {
           Seguimiento centralizado de relaciones
         </h1>
         <p className="max-w-3xl text-muted-foreground">
-          Registrá clientes, documentá interacciones y acreditá puntos desde un solo lugar.
+          Registrá clientes, documentá interacciones y acreditá puntos desde un
+          solo lugar.
         </p>
       </div>
 
@@ -326,7 +338,8 @@ function CrmWorkspaceContent() {
               </div>
             ) : clients.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-muted-foreground">
-                Aún no se registraron clientes. Creá el primero con el formulario lateral.
+                Aún no se registraron clientes. Creá el primero con el
+                formulario lateral.
               </div>
             ) : (
               clients.slice(0, 8).map((client) => (
@@ -335,7 +348,9 @@ function CrmWorkspaceContent() {
                   className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/80 p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
-                    <p className="font-medium text-foreground">{client.username}</p>
+                    <p className="font-medium text-foreground">
+                      {client.username}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       Estado: {client.status.toLowerCase()}
                     </p>
@@ -349,7 +364,9 @@ function CrmWorkspaceContent() {
                     <span className="font-semibold text-foreground">
                       {pesoFormatter.format(client.pointsBalance)}
                     </span>
-                    <span className="text-muted-foreground">Saldo disponible</span>
+                    <span className="text-muted-foreground">
+                      Saldo disponible
+                    </span>
                   </div>
                 </div>
               ))
@@ -367,32 +384,43 @@ function CrmWorkspaceContent() {
             Centro de acciones rápidas
           </CardTitle>
           <CardDescription>
-            Usá el menú flotante para registrar clientes, contactos y acreditaciones sin
-            perder de vista los datos del tablero.
+            Usá el menú flotante para registrar clientes, contactos y
+            acreditaciones sin perder de vista los datos del tablero.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p>
-            El botón con el ícono <Plus className="inline size-4 align-text-top" /> aparece en la esquina
-            inferior derecha. Al pulsarlo se despliegan las acciones disponibles. Seleccioná la que
-            necesites y completá el formulario en un diálogo optimizado para cada tarea.
+            El botón con el ícono{" "}
+            <Plus className="inline size-4 align-text-top" /> aparece en la
+            esquina inferior derecha. Al pulsarlo se despliegan las acciones
+            disponibles. Seleccioná la que necesites y completá el formulario en
+            un diálogo optimizado para cada tarea.
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              <span className="font-medium text-foreground">Registrar nuevo cliente</span>: crea fichas
-              en segundos y mantené actualizado el pipeline comercial.
+              <span className="font-medium text-foreground">
+                Registrar nuevo cliente
+              </span>
+              : crea fichas en segundos y mantené actualizado el pipeline
+              comercial.
             </li>
             <li>
-              <span className="font-medium text-foreground">Registrar contacto</span>: documentá
-              interacciones relevantes para todo el equipo.
+              <span className="font-medium text-foreground">
+                Registrar contacto
+              </span>
+              : documentá interacciones relevantes para todo el equipo.
             </li>
             <li>
-              <span className="font-medium text-foreground">Acreditar puntos</span>: actualizá el saldo
-              de los clientes autorizados sin salir del tablero.
+              <span className="font-medium text-foreground">
+                Acreditar puntos
+              </span>
+              : actualizá el saldo de los clientes autorizados sin salir del
+              tablero.
             </li>
           </ul>
           <p>
-            Podés cerrar los diálogos con la tecla <kbd className="rounded border bg-muted px-1">Esc</kbd> o con el
+            Podés cerrar los diálogos con la tecla{" "}
+            <kbd className="rounded border bg-muted px-1">Esc</kbd> o con el
             botón de cierre sin perder el contexto actual.
           </p>
         </CardContent>
@@ -432,9 +460,13 @@ function CrmWorkspaceContent() {
           size="lg"
           className="h-14 w-14 rounded-full shadow-lg shadow-primary/30"
           onClick={() => setIsMenuOpen((prev) => !prev)}
-          aria-label={isMenuOpen ? "Cerrar menú de acciones" : "Abrir menú de acciones"}
+          aria-label={
+            isMenuOpen ? "Cerrar menú de acciones" : "Abrir menú de acciones"
+          }
         >
-          <Plus className={`size-6 transition-transform ${isMenuOpen ? "rotate-45" : ""}`} />
+          <Plus
+            className={`size-6 transition-transform ${isMenuOpen ? "rotate-45" : ""}`}
+          />
         </Button>
       </div>
 
@@ -448,7 +480,10 @@ function CrmWorkspaceContent() {
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleCreateClient}>
             <div className="space-y-2">
-              <label htmlFor="client-username" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="client-username"
+                className="text-sm font-medium text-foreground"
+              >
                 Usuario / Identificador
               </label>
               <Input
@@ -465,7 +500,10 @@ function CrmWorkspaceContent() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="client-phone" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="client-phone"
+                className="text-sm font-medium text-foreground"
+              >
                 Teléfono
               </label>
               <Input
@@ -492,12 +530,16 @@ function CrmWorkspaceContent() {
           <DialogHeader>
             <DialogTitle>Registrar contacto</DialogTitle>
             <DialogDescription>
-              Documentá interacciones clave para mantener el contexto del equipo.
+              Documentá interacciones clave para mantener el contexto del
+              equipo.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleLogContact}>
             <div className="space-y-2">
-              <label htmlFor="contact-client" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="contact-client"
+                className="text-sm font-medium text-foreground"
+              >
                 Cliente
               </label>
               <select
@@ -524,7 +566,10 @@ function CrmWorkspaceContent() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="contact-channel" className="text-sm font-medium text-foreground">
+                <label
+                  htmlFor="contact-channel"
+                  className="text-sm font-medium text-foreground"
+                >
                   Canal
                 </label>
                 <select
@@ -546,7 +591,10 @@ function CrmWorkspaceContent() {
                 </select>
               </div>
               <div className="space-y-2">
-                <label htmlFor="contact-direction" className="text-sm font-medium text-foreground">
+                <label
+                  htmlFor="contact-direction"
+                  className="text-sm font-medium text-foreground"
+                >
                   Dirección
                 </label>
                 <select
@@ -585,7 +633,10 @@ function CrmWorkspaceContent() {
               </label>
             </div>
             <div className="space-y-2">
-              <label htmlFor="contact-message" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="contact-message"
+                className="text-sm font-medium text-foreground"
+              >
                 Notas
               </label>
               <Textarea
@@ -612,12 +663,16 @@ function CrmWorkspaceContent() {
           <DialogHeader>
             <DialogTitle>Acreditar puntos</DialogTitle>
             <DialogDescription>
-              Actualizá el saldo del cliente directamente desde la gestión comercial.
+              Actualizá el saldo del cliente directamente desde la gestión
+              comercial.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleRegisterCharge}>
             <div className="space-y-2">
-              <label htmlFor="charge-client" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="charge-client"
+                className="text-sm font-medium text-foreground"
+              >
                 Cliente
               </label>
               <select
@@ -643,7 +698,10 @@ function CrmWorkspaceContent() {
               </select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="charge-amount" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="charge-amount"
+                className="text-sm font-medium text-foreground"
+              >
                 Monto (puntos)
               </label>
               <Input
@@ -662,7 +720,10 @@ function CrmWorkspaceContent() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="charge-method" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="charge-method"
+                className="text-sm font-medium text-foreground"
+              >
                 Medio de pago
               </label>
               <select
@@ -684,7 +745,10 @@ function CrmWorkspaceContent() {
               </select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="charge-description" className="text-sm font-medium text-foreground">
+              <label
+                htmlFor="charge-description"
+                className="text-sm font-medium text-foreground"
+              >
                 Nota interna
               </label>
               <Textarea
