@@ -9,9 +9,11 @@ import {
   ClipboardList,
   Coins,
   Filter,
+  Menu,
   Search,
   Sparkles,
   UsersRound,
+  X,
 } from "lucide-react";
 
 import { AuthGuard } from "@/components/auth/AuthGuard";
@@ -79,6 +81,17 @@ function CashierDashboardContent() {
   );
   const [notesMessage, setNotesMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
+  const [showMemberFilters, setShowMemberFilters] = useState(false);
+  const [showDailyFilters, setShowDailyFilters] = useState(false);
+
+  const quickMenuSections = [
+    { href: "#indicadores-turno", label: "Indicadores del día" },
+    { href: "#tablero-cargos", label: "Tablero de cargos" },
+    { href: "#hoja-control", label: "Hoja de control" },
+    { href: "#registro-conciliacion", label: "Registro de conciliación" },
+    { href: "#notas-turno", label: "Notas de turno" },
+  ];
 
   // Cargar datos cuando cambia la fecha
   useEffect(() => {
@@ -101,6 +114,21 @@ function CashierDashboardContent() {
         });
     });
   }, [selectedDate]);
+
+  useEffect(() => {
+    if (!isQuickMenuOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsQuickMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isQuickMenuOpen]);
 
   const chargesForSelectedDate = useMemo(
     () => chargeLog.filter((entry) => entry.timestamp.startsWith(selectedDate)),
@@ -299,7 +327,7 @@ function CashierDashboardContent() {
 
   return (
     <div className="space-y-10">
-      <div className="flex flex-col gap-3">
+      <section className="flex flex-col gap-3">
         <span className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
           Operaciones de cajero
         </span>
@@ -312,9 +340,12 @@ function CashierDashboardContent() {
           filtros y las notas rápidas ayudan al próximo turno a saber
           exactamente cómo están las cosas.
         </p>
-      </div>
+      </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        id="indicadores-turno"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <MetricCard
           title="Monedas registradas hoy"
           value={coinFormatter.format(coinsChargedToday)}
@@ -363,21 +394,22 @@ function CashierDashboardContent() {
           trendDirection={pendingVisits.length === 0 ? "up" : "neutral"}
           description="Miembros que aún no han sido cobrados en el día seleccionado"
         />
-      </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <CardTitle className="text-xl font-semibold text-foreground">
-                  Tablero de cargos diarios
-                </CardTitle>
-                <CardDescription>
-                  Capture las visitas de hoy con solo unos pocos clics. Los montos
-                  actualizan el libro mayor al instante.
-                </CardDescription>
-              </div>
+          <section id="tablero-cargos">
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <CardTitle className="text-xl font-semibold text-foreground">
+                    Tablero de cargos diarios
+                  </CardTitle>
+                  <CardDescription>
+                    Capture las visitas de hoy con solo unos pocos clics. Los montos
+                    actualizan el libro mayor al instante.
+                  </CardDescription>
+                </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <label className="flex flex-col text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                   Fecha de trabajo
@@ -391,32 +423,65 @@ function CashierDashboardContent() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                  <Search className="size-4 text-muted-foreground" />
-                  <Input
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Buscar miembro o nivel"
-                    className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-                  />
+              {showMemberFilters ? (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                      <Search className="size-4 text-muted-foreground" />
+                      <Input
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Buscar miembro o nivel"
+                        className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Filter className="size-4 text-muted-foreground" />
+                      <select
+                        className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+                        value={tierFilter}
+                        onChange={(event) =>
+                          setTierFilter(event.target.value as typeof tierFilter)
+                        }
+                      >
+                        <option value="all">Todos los niveles</option>
+                        <option value="Premium">Premium</option>
+                        <option value="Estándar">Estándar</option>
+                        <option value="Empresarial">Empresarial</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowMemberFilters(false)}
+                    >
+                      Ocultar filtros
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Filter className="size-4 text-muted-foreground" />
-                  <select
-                    className="h-9 rounded-md border border-border bg-background px-3 text-sm"
-                    value={tierFilter}
-                    onChange={(event) =>
-                      setTierFilter(event.target.value as typeof tierFilter)
-                    }
+              ) : (
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      Filtros del libro mayor ocultos
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Ábrelos cuando los necesites desde aquí o con el menú flotante.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMemberFilters(true)}
                   >
-                    <option value="all">Todos los niveles</option>
-                    <option value="Premium">Premium</option>
-                    <option value="Estándar">Estándar</option>
-                    <option value="Empresarial">Empresarial</option>
-                  </select>
+                    Mostrar filtros
+                  </Button>
                 </div>
-              </div>
+              )}
 
               <div className="overflow-hidden rounded-xl border border-border/60">
                 <div className="hidden grid-cols-[2fr_1fr_1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
@@ -506,44 +571,81 @@ function CashierDashboardContent() {
               </div>
             </CardContent>
           </Card>
+          </section>
 
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-foreground">
-                Hoja de control diario
-              </CardTitle>
-              <CardDescription>
-                Marque quién cargó puntos en la fecha seleccionada para dejar
-                constancia al equipo administrativo.
-              </CardDescription>
+          <section id="hoja-control">
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Hoja de control diario
+                </CardTitle>
+                <CardDescription>
+                  Marque quién cargó puntos en la fecha seleccionada para dejar
+                  constancia al equipo administrativo.
+                </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                  <Search className="size-4 text-muted-foreground" />
-                  <Input
-                    value={sheetSearchTerm}
-                    onChange={(event) => setSheetSearchTerm(event.target.value)}
-                    placeholder="Buscar por usuario o teléfono"
-                    className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-                  />
+              {showDailyFilters ? (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                      <Search className="size-4 text-muted-foreground" />
+                      <Input
+                        value={sheetSearchTerm}
+                        onChange={(event) => setSheetSearchTerm(event.target.value)}
+                        placeholder="Buscar por usuario o teléfono"
+                        className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Filter className="size-4 text-muted-foreground" />
+                      <select
+                        className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+                        value={sheetStatusFilter}
+                        onChange={(event) =>
+                          setSheetStatusFilter(
+                            event.target.value as SheetStatusFilter,
+                          )
+                        }
+                      >
+                        <option value="all">Todos los estados</option>
+                        <option value="charged">Marcados como cargó</option>
+                        <option value="not-charged">Marcados como no cargó</option>
+                        <option value="pending">Sin registro</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowDailyFilters(false)}
+                    >
+                      Ocultar filtros
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Filter className="size-4 text-muted-foreground" />
-                  <select
-                    className="h-9 rounded-md border border-border bg-background px-3 text-sm"
-                    value={sheetStatusFilter}
-                    onChange={(event) =>
-                      setSheetStatusFilter(event.target.value as SheetStatusFilter)
-                    }
+              ) : (
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      Filtros de la hoja de control ocultos
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Actívalos desde aquí o con el menú flotante para afinar la vista.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDailyFilters(true)}
                   >
-                    <option value="all">Todos los estados</option>
-                    <option value="charged">Marcados como cargó</option>
-                    <option value="not-charged">Marcados como no cargó</option>
-                    <option value="pending">Sin registro</option>
-                  </select>
+                    Mostrar filtros
+                  </Button>
                 </div>
-              </div>
+              )}
 
               <div className="overflow-hidden rounded-xl border border-border/60">
                 <div className="hidden grid-cols-[1.6fr_1.1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
@@ -628,27 +730,37 @@ function CashierDashboardContent() {
                             )}
                           </div>
                           <div className="flex flex-col gap-2 md:items-end">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => handleDailyCheckUpdate(row.clientId, true)}
-                                disabled={sheetSaving[row.clientId]}
-                              >
-                                <CheckCircle2 className="mr-2 size-4" />
-                                Cobró
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDailyCheckUpdate(row.clientId, false)}
-                                disabled={sheetSaving[row.clientId]}
-                              >
-                                <CircleSlash2 className="mr-2 size-4" />
-                                No cobró
-                              </Button>
-                            </div>
+                            {row.hasCharged === null ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDailyCheckUpdate(row.clientId, true)
+                                  }
+                                  disabled={sheetSaving[row.clientId]}
+                                >
+                                  <CheckCircle2 className="mr-2 size-4" />
+                                  Cobró
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    handleDailyCheckUpdate(row.clientId, false)
+                                  }
+                                  disabled={sheetSaving[row.clientId]}
+                                >
+                                  <CircleSlash2 className="mr-2 size-4" />
+                                  No cobró
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
+                                Estado registrado para hoy
+                              </span>
+                            )}
                             {sheetSaving[row.clientId] && (
                               <span className="text-xs text-muted-foreground">
                                 Guardando cambios...
@@ -667,19 +779,21 @@ function CashierDashboardContent() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+            </Card>
+          </section>
         </div>
 
         <div className="space-y-6">
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-foreground">
-                Registro de conciliación diaria
-              </CardTitle>
-              <CardDescription>
-                Todas las monedas registradas para la fecha seleccionada
-                aparecen aquí al instante.
-              </CardDescription>
+          <section id="registro-conciliacion">
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Registro de conciliación diaria
+                </CardTitle>
+                <CardDescription>
+                  Todas las monedas registradas para la fecha seleccionada
+                  aparecen aquí al instante.
+                </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {chargesForSelectedDate.length === 0 ? (
@@ -725,16 +839,18 @@ function CashierDashboardContent() {
                 {chargesForSelectedDate.length} registros totales
               </div>
             </CardFooter>
-          </Card>
+            </Card>
+          </section>
 
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-foreground">
-                Notas de turno
-              </CardTitle>
-              <CardDescription>
-                Deje una guía para el próximo cajero o resuma los incidentes.
-              </CardDescription>
+          <section id="notas-turno">
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Notas de turno
+                </CardTitle>
+                <CardDescription>
+                  Deje una guía para el próximo cajero o resuma los incidentes.
+                </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
@@ -762,9 +878,87 @@ function CashierDashboardContent() {
               </Button>
               <Button onClick={handleSaveNotes}>Guardar para el turno</Button>
             </CardFooter>
-          </Card>
+            </Card>
+          </section>
         </div>
       </div>
+
+      {isQuickMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-background/30 backdrop-blur-sm"
+          onClick={() => setIsQuickMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <nav
+        aria-label="Menú flotante de navegación"
+        className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3"
+      >
+        {isQuickMenuOpen && (
+          <div className="w-64 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+              Navegación rápida
+            </p>
+            <ul className="mt-3 space-y-1">
+              {quickMenuSections.map((item) => (
+                <li key={item.href}>
+                  <a
+                    className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted/60"
+                    href={item.href}
+                    onClick={() => setIsQuickMenuOpen(false)}
+                  >
+                    {item.label}
+                    <span className="text-xs text-muted-foreground">↗</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 space-y-2 border-t border-border/60 pt-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">
+                Controles
+              </p>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className="w-full rounded-lg border border-border/60 px-3 py-2 text-left text-sm text-foreground transition hover:bg-muted/60"
+                  onClick={() => {
+                    setShowMemberFilters((prev) => !prev);
+                    setIsQuickMenuOpen(false);
+                  }}
+                >
+                  {showMemberFilters
+                    ? "Ocultar filtros de miembros"
+                    : "Mostrar filtros de miembros"}
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-lg border border-border/60 px-3 py-2 text-left text-sm text-foreground transition hover:bg-muted/60"
+                  onClick={() => {
+                    setShowDailyFilters((prev) => !prev);
+                    setIsQuickMenuOpen(false);
+                  }}
+                >
+                  {showDailyFilters
+                    ? "Ocultar filtros de hoja"
+                    : "Mostrar filtros de hoja"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <Button
+          type="button"
+          size="icon"
+          className="h-12 w-12 rounded-full shadow-lg"
+          onClick={() => setIsQuickMenuOpen((prev) => !prev)}
+          aria-expanded={isQuickMenuOpen}
+          aria-label={
+            isQuickMenuOpen ? "Cerrar menú flotante" : "Abrir menú flotante"
+          }
+        >
+          {isQuickMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+        </Button>
+      </nav>
     </div>
   );
 }
