@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 
-import { loginAction } from "@/actions/login";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { getDashboardRouteForRole } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth-store";
+import type { LoginResponse } from "@/types/auth";
 
 export function LoginCard() {
   const router = useRouter();
@@ -40,12 +40,28 @@ export function LoginCard() {
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
+    const username = String(formData.get("username") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    if (!username || !password) {
+      setError("Ingresá usuario y contraseña.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      const result = await loginAction(formData);
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-      if (!result.success) {
-        setError(result.error);
+      const result = (await response.json()) as LoginResponse;
+
+      if (!response.ok || !result.success) {
+        setError(result.error ?? "No pudimos iniciar sesión. Intentá de nuevo.");
         setIsSubmitting(false);
         return;
       }

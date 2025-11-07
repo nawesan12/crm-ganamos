@@ -4,7 +4,8 @@ import { PropsWithChildren, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { getDashboardRouteForRole } from "@/lib/auth";
-import { AuthRole, useAuthStore } from "@/stores/auth-store";
+import { useAuthStore } from "@/stores/auth-store";
+import type { AuthRole } from "@/types/auth";
 
 function useAuthHydration() {
   const [hydrated, setHydrated] = useState(

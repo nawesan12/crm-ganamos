@@ -5,7 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, UserCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { AuthRole, useAuthStore } from "@/stores/auth-store";
+import { useAuthStore } from "@/stores/auth-store";
+import type { AuthRole } from "@/types/auth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";

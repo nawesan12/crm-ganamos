@@ -2,15 +2,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
+import type { AuthRole, AuthUser } from "@/types/auth";
 
-export type AuthRole = "ADMIN" | "CASHIER" | "AGENT";
-
-export type RegisterUserPayload = {
-  id: number;
-  name: string;
-  username: string;
-  role: AuthRole;
-};
+export type RegisterUserPayload = AuthUser;
 
 export type RegisterResult =
   | {

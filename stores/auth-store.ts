@@ -3,14 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-export type AuthRole = "ADMIN" | "CASHIER" | "AGENT";
-
-export type AuthUser = {
-  id: number;
-  name: string;
-  username: string;
-  role: AuthRole;
-};
+import type { AuthUser } from "@/types/auth";
 
 type AuthState = {
   user: AuthUser | null;
