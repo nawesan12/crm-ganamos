@@ -1,4 +1,3 @@
-// app/(dashboard)/admin/page.tsx (o donde tengas este componente)
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -52,6 +51,8 @@ const integerFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
+type QuickActionKey = "team" | "client" | "cashier";
+
 export default function AdminDashboardPage() {
   return (
     <AuthGuard allowedRoles={["ADMIN"]}>
@@ -101,17 +102,17 @@ function AdminDashboardContent() {
     notes: "",
   });
 
-  const [userMessage, setUserMessage] = useState<string | null>(null);
-  const [clientMessage, setClientMessage] = useState<string | null>(null);
-  const [cashierMessage, setCashierMessage] = useState<string | null>(null);
-
   const [cashierForm, setCashierForm] = useState({
     name: "",
     username: "",
     password: "",
   });
 
-  // Cargar datos iniciales
+  const [userMessage, setUserMessage] = useState<string | null>(null);
+  const [clientMessage, setClientMessage] = useState<string | null>(null);
+  const [cashierMessage, setCashierMessage] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<QuickActionKey>("team");
+
   useEffect(() => {
     startTransition(() => {
       getAdminDashboardData()
@@ -387,9 +388,8 @@ function AdminDashboardContent() {
         </h1>
         <p className="max-w-3xl text-muted-foreground">
           Manténgase a la vanguardia de la incorporación, el rendimiento del
-          equipo y la salud del cliente. Utilice los formularios a continuación
-          para incorporar compañeros de equipo y nuevas cuentas sin salir de la
-          vista de análisis.
+          equipo y la salud del cliente. Use las acciones rápidas para ejecutar
+          tareas comunes sin saturar la vista principal.
         </p>
       </div>
 
@@ -432,636 +432,705 @@ function AdminDashboardContent() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Cola de incorporación del equipo
-            </CardTitle>
-            <CardDescription>
-              Cuentas de mayor valor en la parte superior para enfocar los
-              recursos de implementación.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {isLoadingDashboard && clients.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                Cargando datos de cuentas...
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
+        <div className="space-y-6">
+          <Card className="border-border/70 bg-background/90">
+            <CardHeader className="space-y-4">
+              <div className="space-y-1">
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Acciones rápidas
+                </CardTitle>
+                <CardDescription>
+                  Centralice los registros clave y elija solo el formulario que
+                  necesita en cada momento.
+                </CardDescription>
               </div>
-            ) : onboardingQueue.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                No hay cuentas en proceso de incorporación en este momento.
-                Agregue un nuevo cliente para comenzar.
-              </div>
-            ) : (
-              onboardingQueue.map((client) => (
-                <div
-                  key={client.id}
-                  className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/80 p-5 sm:flex-row sm:items-center sm:justify-between"
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={activeAction === "team" ? "default" : "outline"}
+                  onClick={() => setActiveAction("team")}
+                  aria-pressed={activeAction === "team"}
+                  className="gap-2"
                 >
-                  <div className="flex flex-col gap-1">
-                    <span className="text-lg font-medium text-foreground">
-                      {client.company}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {client.poc} • {client.email}
-                    </span>
-                    {client.notes && (
-                      <p className="text-sm text-muted-foreground">
-                        {client.notes}
+                  <Users className="size-4" />
+                  Equipo
+                </Button>
+                <Button
+                  variant={activeAction === "client" ? "default" : "outline"}
+                  onClick={() => setActiveAction("client")}
+                  aria-pressed={activeAction === "client"}
+                  className="gap-2"
+                >
+                  <CircleDollarSign className="size-4" />
+                  Cliente
+                </Button>
+                <Button
+                  variant={activeAction === "cashier" ? "default" : "outline"}
+                  onClick={() => setActiveAction("cashier")}
+                  aria-pressed={activeAction === "cashier"}
+                  className="gap-2"
+                >
+                  <CalendarPlus className="size-4" />
+                  Cajero
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {activeAction === "team" && (
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-semibold text-foreground">
+                      Incorporar compañero de equipo
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Suma perfiles comerciales y operativos para colaborar en
+                      este espacio de trabajo.
+                    </p>
+                  </div>
+                  <form className="space-y-4" onSubmit={handleAddUser}>
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor="name"
+                      >
+                        Nombre completo
+                      </label>
+                      <Input
+                        id="name"
+                        placeholder="p.ej. Mariana López"
+                        value={userForm.name}
+                        onChange={(event) =>
+                          setUserForm((prev) => ({
+                            ...prev,
+                            name: event.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor="username"
+                      >
+                        Nombre de usuario
+                      </label>
+                      <Input
+                        id="username"
+                        autoComplete="username"
+                        placeholder="mariana.lopez"
+                        value={userForm.username}
+                        onChange={(event) =>
+                          setUserForm((prev) => ({
+                            ...prev,
+                            username: event.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor="password"
+                      >
+                        Contraseña temporal
+                      </label>
+                      <Input
+                        id="password"
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Asigna una clave segura"
+                        value={userForm.password}
+                        onChange={(event) =>
+                          setUserForm((prev) => ({
+                            ...prev,
+                            password: event.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="role"
+                        >
+                          Rol dentro del equipo
+                        </label>
+                        <Input
+                          id="role"
+                          placeholder="Ejecutivo comercial"
+                          value={userForm.role}
+                          onChange={(event) =>
+                            setUserForm((prev) => ({
+                              ...prev,
+                              role: event.target.value,
+                            }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="status"
+                        >
+                          Estado de preparación
+                        </label>
+                        <select
+                          id="status"
+                          className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          value={userForm.status}
+                          onChange={(event) =>
+                            setUserForm((prev) => ({
+                              ...prev,
+                              status: event.target.value as TeamMemberStatus,
+                            }))
+                          }
+                        >
+                          <option value="En curso">En curso</option>
+                          <option value="En riesgo">En riesgo</option>
+                          <option value="Nuevo ingreso">Nuevo ingreso</option>
+                        </select>
+                      </div>
+                    </div>
+                    {userMessage && (
+                      <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                        {userMessage}
                       </p>
                     )}
-                  </div>
-                  <div className="flex w-full items-center justify-end gap-6 text-sm sm:w-auto">
-                    <div className="flex flex-col items-end">
-                      <span className="font-medium text-foreground">
-                        {currency.format(client.monthlyValue)}
-                      </span>
-                      <span className="text-muted-foreground">
-                        Valor potencial
-                      </span>
+                    <div className="flex items-center justify-end gap-3">
+                      <Button
+                        type="reset"
+                        variant="ghost"
+                        onClick={() => {
+                          setUserForm({
+                            name: "",
+                            username: "",
+                            password: "",
+                            role: "",
+                            status: "En curso",
+                          });
+                          setUserMessage(null);
+                        }}
+                      >
+                        Limpiar
+                      </Button>
+                      <Button type="submit" className="px-6">
+                        Invitar a compañero de equipo
+                      </Button>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className="font-medium text-foreground">
-                        {client.onboardingDays} días
-                      </span>
-                      <span className="text-muted-foreground">
-                        En incorporación
-                      </span>
-                    </div>
-                  </div>
+                  </form>
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Registrar un nuevo cajero
-            </CardTitle>
-            <CardDescription>
-              Crea credenciales dedicadas para el equipo de cajas y mantené su
-              actividad centralizada.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={handleAddCashier}>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="cashierName">
-                  Nombre completo
-                </label>
-                <Input
-                  id="cashierName"
-                  placeholder="p.ej. Valeria Mendoza"
-                  value={cashierForm.name}
-                  onChange={(event) =>
-                    setCashierForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="cashierUsername">
-                  Nombre de usuario
-                </label>
-                <Input
-                  id="cashierUsername"
-                  autoComplete="username"
-                  placeholder="valeria.mendoza"
-                  value={cashierForm.username}
-                  onChange={(event) =>
-                    setCashierForm((prev) => ({
-                      ...prev,
-                      username: event.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="cashierPassword">
-                  Contraseña temporal
-                </label>
-                <Input
-                  id="cashierPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="Asigna una clave segura"
-                  value={cashierForm.password}
-                  onChange={(event) =>
-                    setCashierForm((prev) => ({
-                      ...prev,
-                      password: event.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              {cashierMessage && (
-                <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                  {cashierMessage}
-                </p>
               )}
-              <div className="flex items-center justify-end gap-3">
-                <Button
-                  type="reset"
-                  variant="ghost"
-                  onClick={() => {
-                    setCashierForm({ name: "", username: "", password: "" });
-                    setCashierMessage(null);
-                  }}
-                >
-                  Limpiar
-                </Button>
-                <Button type="submit" className="px-6" disabled={isCreatingCashier}>
-                  {isCreatingCashier ? "Creando..." : "Crear cajero"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
 
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Actividad reciente de cajeros
-            </CardTitle>
-            <CardDescription>
-              Volumen de recargas y clientes atendidos durante los últimos 30
-              días.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoadingDashboard && cashiers.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                Cargando registros de cajeros...
-              </div>
-            ) : sortedCashiers.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                Todavía no hay cajeros activos. Registrá uno para comenzar a
-                medir su impacto.
-              </div>
-            ) : (
-              <div className="divide-y divide-border/60 rounded-xl border border-border/60">
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">
-                  <span>Cajero</span>
-                  <span>Último cargo</span>
-                  <span className="text-right">Clientes (30d)</span>
-                  <span className="text-right">Monto cargado (30d)</span>
-                </div>
-                {sortedCashiers.map((cashier) => (
-                  <div
-                    key={cashier.id}
-                    className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 px-6 py-4 text-sm text-muted-foreground"
-                  >
-                    <div className="flex flex-col text-foreground">
-                      <span className="font-medium">{cashier.name}</span>
-                      <span className="text-muted-foreground">@{cashier.username}</span>
+              {activeAction === "client" && (
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-semibold text-foreground">
+                      Agregar una cuenta de cliente
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Capture el contexto de la puesta en marcha para que el
+                      equipo de éxito pueda dar seguimiento.
+                    </p>
+                  </div>
+                  <form className="space-y-4" onSubmit={handleAddClient}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="company"
+                        >
+                          Nombre de la empresa
+                        </label>
+                        <Input
+                          id="company"
+                          placeholder="Empresa Ejemplo"
+                          value={clientForm.company}
+                          onChange={(event) =>
+                            setClientForm((prev) => ({
+                              ...prev,
+                              company: event.target.value,
+                            }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="poc"
+                        >
+                          Punto de contacto
+                        </label>
+                        <Input
+                          id="poc"
+                          placeholder="Nombre y apellido"
+                          value={clientForm.poc}
+                          onChange={(event) =>
+                            setClientForm((prev) => ({
+                              ...prev,
+                              poc: event.target.value,
+                            }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="clientEmail"
+                        >
+                          Correo electrónico de contacto
+                        </label>
+                        <Input
+                          id="clientEmail"
+                          type="email"
+                          placeholder="contacto@empresa.mx"
+                          value={clientForm.email}
+                          onChange={(event) =>
+                            setClientForm((prev) => ({
+                              ...prev,
+                              email: event.target.value,
+                            }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="stage"
+                        >
+                          Etapa del ciclo de vida
+                        </label>
+                        <select
+                          id="stage"
+                          className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          value={clientForm.stage}
+                          onChange={(event) =>
+                            setClientForm((prev) => ({
+                              ...prev,
+                              stage: event.target.value as ClientLifecycleStage,
+                            }))
+                          }
+                        >
+                          <option value="Incorporación">Incorporación</option>
+                          <option value="Nutrición">Nutrición</option>
+                          <option value="Expansión">Expansión</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="monthlyValue"
+                        >
+                          Valor mensual (USD)
+                        </label>
+                        <Input
+                          id="monthlyValue"
+                          inputMode="decimal"
+                          placeholder="4500"
+                          value={clientForm.monthlyValue}
+                          onChange={(event) =>
+                            setClientForm((prev) => ({
+                              ...prev,
+                              monthlyValue: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="onboardingDays"
+                        >
+                          Días en incorporación
+                        </label>
+                        <Input
+                          id="onboardingDays"
+                          inputMode="numeric"
+                          placeholder="14"
+                          value={clientForm.onboardingDays}
+                          onChange={(event) =>
+                            setClientForm((prev) => ({
+                              ...prev,
+                              onboardingDays: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
                     </div>
-                    <span>
-                      {cashier.lastChargeAt
-                        ? dateFormatter.format(new Date(cashier.lastChargeAt))
-                        : "Sin cargos recientes"}
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor="notes"
+                      >
+                        Notas para el equipo
+                      </label>
+                      <Textarea
+                        id="notes"
+                        placeholder="Contexto, bloqueadores o próximos pasos"
+                        value={clientForm.notes}
+                        onChange={(event) =>
+                          setClientForm((prev) => ({
+                            ...prev,
+                            notes: event.target.value,
+                          }))
+                        }
+                        rows={3}
+                      />
+                    </div>
+                    {clientMessage && (
+                      <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                        {clientMessage}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-end gap-3">
+                      <Button
+                        type="reset"
+                        variant="ghost"
+                        onClick={() => {
+                          setClientForm({
+                            company: "",
+                            poc: "",
+                            email: "",
+                            stage: "Incorporación",
+                            monthlyValue: "",
+                            onboardingDays: "14",
+                            notes: "",
+                          });
+                          setClientMessage(null);
+                        }}
+                      >
+                        Limpiar
+                      </Button>
+                      <Button type="submit" className="px-6">
+                        Crear cliente
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {activeAction === "cashier" && (
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-semibold text-foreground">
+                      Registrar un nuevo cajero
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Crea credenciales dedicadas para el equipo de cajas y
+                      mantené su actividad centralizada.
+                    </p>
+                  </div>
+                  <form className="space-y-4" onSubmit={handleAddCashier}>
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor="cashierName"
+                      >
+                        Nombre completo
+                      </label>
+                      <Input
+                        id="cashierName"
+                        placeholder="p.ej. Valeria Mendoza"
+                        value={cashierForm.name}
+                        onChange={(event) =>
+                          setCashierForm((prev) => ({
+                            ...prev,
+                            name: event.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor="cashierUsername"
+                      >
+                        Nombre de usuario
+                      </label>
+                      <Input
+                        id="cashierUsername"
+                        autoComplete="username"
+                        placeholder="valeria.mendoza"
+                        value={cashierForm.username}
+                        onChange={(event) =>
+                          setCashierForm((prev) => ({
+                            ...prev,
+                            username: event.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor="cashierPassword"
+                      >
+                        Contraseña temporal
+                      </label>
+                      <Input
+                        id="cashierPassword"
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Asigna una clave segura"
+                        value={cashierForm.password}
+                        onChange={(event) =>
+                          setCashierForm((prev) => ({
+                            ...prev,
+                            password: event.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </div>
+                    {cashierMessage && (
+                      <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                        {cashierMessage}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-end gap-3">
+                      <Button
+                        type="reset"
+                        variant="ghost"
+                        onClick={() => {
+                          setCashierForm({ name: "", username: "", password: "" });
+                          setCashierMessage(null);
+                        }}
+                      >
+                        Limpiar
+                      </Button>
+                      <Button type="submit" className="px-6" disabled={isCreatingCashier}>
+                        {isCreatingCashier ? "Creando..." : "Crear cajero"}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70 bg-background/90">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-foreground">
+                Cola de incorporación del equipo
+              </CardTitle>
+              <CardDescription>
+                Cuentas de mayor valor en la parte superior para enfocar los
+                recursos de implementación.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {isLoadingDashboard && clients.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  Cargando datos de cuentas...
+                </div>
+              ) : onboardingQueue.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  No hay cuentas en proceso de incorporación en este momento.
+                  Agregue un nuevo cliente para comenzar.
+                </div>
+              ) : (
+                onboardingQueue.map((client) => (
+                  <div
+                    key={client.id}
+                    className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/80 p-5 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="text-lg font-medium text-foreground">
+                        {client.company}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {client.poc} • {client.email}
+                      </span>
+                      {client.notes && (
+                        <p className="text-sm text-muted-foreground">
+                          {client.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex w-full items-center justify-end gap-6 text-sm sm:w-auto">
+                      <div className="flex flex-col items-end">
+                        <span className="font-medium text-foreground">
+                          {currency.format(client.monthlyValue)}
+                        </span>
+                        <span className="text-muted-foreground">
+                          Valor potencial
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="font-medium text-foreground">
+                          {client.onboardingDays} días
+                        </span>
+                        <span className="text-muted-foreground">
+                          En incorporación
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70 bg-background/90">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Resumen de rendimiento del equipo
+                </CardTitle>
+                <CardDescription>
+                  Supervise la carga de acuerdos y la actividad de participación
+                  por compañero de equipo.
+                </CardDescription>
+              </div>
+              <Button variant="outline" className="px-4">
+                Exportar CSV
+              </Button>
+            </CardHeader>
+            <CardContent className="overflow-hidden rounded-xl border border-border/60">
+              <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_1fr] bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground sm:grid">
+                <span>Compañero de equipo</span>
+                <span>Rol</span>
+                <span>Última vez activo</span>
+                <span className="text-right">Acuerdos activos</span>
+              </div>
+              <div className="divide-y divide-border/60">
+                {teamMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="grid gap-4 px-6 py-4 text-sm sm:grid-cols-[2fr_1.5fr_1.5fr_1fr] sm:items-center"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium text-foreground">
+                        {member.name}
+                      </span>
+                      <span className="text-muted-foreground">@{member.username}</span>
+                    </div>
+                    <span className="text-muted-foreground">{member.role}</span>
+                    <span className="text-muted-foreground">
+                      {dateFormatter.format(new Date(member.lastActive))}
                     </span>
                     <span className="text-right font-medium text-foreground">
-                      {integerFormatter.format(cashier.clientsServedLast30)}
+                      {member.activeDeals}
                     </span>
-                    <div className="text-right">
-                      <div className="font-medium text-foreground">
-                        {currency.format(cashier.totalChargedLast30)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {integerFormatter.format(cashier.chargesLast30)}
-                        {" "}
-                        {cashier.chargesLast30 === 1 ? "cargo" : "cargos"}
-                      </div>
-                    </div>
                   </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-          <CardFooter className="justify-between text-sm text-muted-foreground">
-            <span>
-              {sortedCashiers.length} {sortedCashiers.length === 1 ? "cajero activo" : "cajeros activos"}
-            </span>
-            <span className="flex items-center gap-1">
-              Total 30d: <span className="font-medium text-foreground">{currency.format(totalCashierVolume)}</span>
-            </span>
-          </CardFooter>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Form equipo */}
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Agregar un compañero de equipo
-            </CardTitle>
-            <CardDescription>
-              Proporcione acceso a especialistas en ventas, éxito o
-              implementación.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={handleAddUser}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="name"
-                  >
-                    Nombre completo
-                  </label>
-                  <Input
-                    id="name"
-                    placeholder="p.ej. Fernanda Ruiz"
-                    value={userForm.name}
-                    onChange={(event) =>
-                      setUserForm((prev) => ({
-                        ...prev,
-                        name: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="username"
-                  >
-                    Nombre de usuario
-                  </label>
-                  <Input
-                    id="username"
-                    autoComplete="username"
-                    placeholder="fernanda.ruiz"
-                    value={userForm.username}
-                    onChange={(event) =>
-                      setUserForm((prev) => ({
-                        ...prev,
-                        username: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="password"
-                  >
-                    Contraseña temporal
-                  </label>
-                  <Input
-                    id="password"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Generá una contraseña segura"
-                    value={userForm.password}
-                    onChange={(event) =>
-                      setUserForm((prev) => ({
-                        ...prev,
-                        password: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="role"
-                  >
-                    Rol
-                  </label>
-                  <Input
-                    id="role"
-                    placeholder="Éxito del cliente"
-                    value={userForm.role}
-                    onChange={(event) =>
-                      setUserForm((prev) => ({
-                        ...prev,
-                        role: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="status"
-                  >
-                    Estado de preparación
-                  </label>
-                  <select
-                    id="status"
-                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    value={userForm.status}
-                    onChange={(event) =>
-                      setUserForm((prev) => ({
-                        ...prev,
-                        status: event.target.value as TeamMemberStatus,
-                      }))
-                    }
-                  >
-                    <option value="En curso">En curso</option>
-                    <option value="En riesgo">En riesgo</option>
-                    <option value="Nuevo ingreso">Nuevo ingreso</option>
-                  </select>
-                </div>
+            </CardContent>
+            <CardFooter className="justify-between text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Users className="size-4" />
+                {teamMembers.length} compañeros de equipo incorporados
               </div>
-              {userMessage && (
-                <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                  {userMessage}
-                </p>
+              <div className="flex items-center gap-2">
+                <CircleDollarSign className="size-4" />
+                {currency.format(
+                  clients.reduce((acc, client) => acc + client.monthlyValue, 0),
+                )}{" "}
+                en ingresos gestionados
+              </div>
+            </CardFooter>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="border-border/70 bg-background/90">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-foreground">
+                Actividad reciente de cajeros
+              </CardTitle>
+              <CardDescription>
+                {cashiers.length === 0
+                  ? "Todavía no hay cajeros activos."
+                  : `${cashiers.length} cajeros activos • ${currency.format(totalCashierVolume)} recaudados en 30 días.`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingDashboard && cashiers.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  Cargando registros de cajeros...
+                </div>
+              ) : sortedCashiers.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  Todavía no hay cajeros activos. Registrá uno para comenzar a
+                  operar.
+                </div>
+              ) : (
+                sortedCashiers.map((cashier) => (
+                  <div
+                    key={cashier.id}
+                    className="space-y-4 rounded-xl border border-border/60 bg-background/80 p-5"
+                  >
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-lg font-medium text-foreground">
+                          {cashier.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          @{cashier.username}
+                        </p>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        Último cargo {cashier.lastChargeAt
+                          ? dateFormatter.format(new Date(cashier.lastChargeAt))
+                          : "sin registrar"}
+                      </span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                          Clientes (30d)
+                        </p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {integerFormatter.format(cashier.clientsServedLast30)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                          Cargos (30d)
+                        </p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {integerFormatter.format(cashier.chargesLast30)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                          Monto cargado
+                        </p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {currency.format(cashier.totalChargedLast30)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
-              <div className="flex items-center justify-end gap-3">
-                <Button
-                  type="reset"
-                  variant="ghost"
-                  onClick={() => {
-                    setUserForm({
-                      name: "",
-                      username: "",
-                      password: "",
-                      role: "",
-                      status: "En curso",
-                    });
-                    setUserMessage(null);
-                  }}
-                >
-                  Limpiar
-                </Button>
-                <Button type="submit" className="px-6">
-                  Invitar a compañero de equipo
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Form cliente */}
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Agregar una cuenta de cliente
-            </CardTitle>
-            <CardDescription>
-              Capture el contexto de la puesta en marcha para que el equipo de
-              éxito pueda dar seguimiento.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={handleAddClient}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="company"
-                  >
-                    Nombre de la empresa
-                  </label>
-                  <Input
-                    id="company"
-                    placeholder="Empresa Ejemplo"
-                    value={clientForm.company}
-                    onChange={(event) =>
-                      setClientForm((prev) => ({
-                        ...prev,
-                        company: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="poc"
-                  >
-                    Punto de contacto
-                  </label>
-                  <Input
-                    id="poc"
-                    placeholder="Nombre y apellido"
-                    value={clientForm.poc}
-                    onChange={(event) =>
-                      setClientForm((prev) => ({
-                        ...prev,
-                        poc: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="clientEmail"
-                  >
-                    Correo electrónico de contacto
-                  </label>
-                  <Input
-                    id="clientEmail"
-                    type="email"
-                    placeholder="contacto@empresa.mx"
-                    value={clientForm.email}
-                    onChange={(event) =>
-                      setClientForm((prev) => ({
-                        ...prev,
-                        email: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="stage"
-                  >
-                    Etapa del ciclo de vida
-                  </label>
-                  <select
-                    id="stage"
-                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    value={clientForm.stage}
-                    onChange={(event) =>
-                      setClientForm((prev) => ({
-                        ...prev,
-                        stage: event.target.value as ClientLifecycleStage,
-                      }))
-                    }
-                  >
-                    <option value="Incorporación">Incorporación</option>
-                    <option value="Nutrición">Nutrición</option>
-                    <option value="Expansión">Expansión</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="monthlyValue"
-                  >
-                    Valor mensual (USD)
-                  </label>
-                  <Input
-                    id="monthlyValue"
-                    inputMode="decimal"
-                    placeholder="4500"
-                    value={clientForm.monthlyValue}
-                    onChange={(event) =>
-                      setClientForm((prev) => ({
-                        ...prev,
-                        monthlyValue: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-medium text-foreground"
-                    htmlFor="onboardingDays"
-                  >
-                    Días en incorporación
-                  </label>
-                  <Input
-                    id="onboardingDays"
-                    inputMode="numeric"
-                    placeholder="14"
-                    value={clientForm.onboardingDays}
-                    onChange={(event) =>
-                      setClientForm((prev) => ({
-                        ...prev,
-                        onboardingDays: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="notes"
-                >
-                  Notas para el equipo
-                </label>
-                <Textarea
-                  id="notes"
-                  placeholder="Contexto, bloqueadores o próximos pasos"
-                  value={clientForm.notes}
-                  onChange={(event) =>
-                    setClientForm((prev) => ({
-                      ...prev,
-                      notes: event.target.value,
-                    }))
-                  }
-                  rows={3}
-                />
-              </div>
-              {clientMessage && (
-                <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                  {clientMessage}
-                </p>
-              )}
-              <div className="flex items-center justify-end gap-3">
-                <Button
-                  type="reset"
-                  variant="ghost"
-                  onClick={() => {
-                    setClientForm({
-                      company: "",
-                      poc: "",
-                      email: "",
-                      stage: "Incorporación",
-                      monthlyValue: "",
-                      onboardingDays: "14",
-                      notes: "",
-                    });
-                    setClientMessage(null);
-                  }}
-                >
-                  Limpiar
-                </Button>
-                <Button type="submit" className="px-6">
-                  Crear cliente
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-border/70 bg-background/90">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Resumen de rendimiento del equipo
-            </CardTitle>
-            <CardDescription>
-              Supervise la carga de acuerdos y la actividad de participación por
-              compañero de equipo.
-            </CardDescription>
-          </div>
-          <Button variant="outline" className="px-4">
-            Exportar CSV
-          </Button>
-        </CardHeader>
-        <CardContent className="overflow-hidden rounded-xl border border-border/60">
-          <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_1fr] bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground sm:grid">
-            <span>Compañero de equipo</span>
-            <span>Rol</span>
-            <span>Última vez activo</span>
-            <span className="text-right">Acuerdos activos</span>
-          </div>
-          <div className="divide-y divide-border/60">
-            {teamMembers.map((member) => (
-              <div
-                key={member.id}
-                className="grid gap-4 px-6 py-4 text-sm sm:grid-cols-[2fr_1.5fr_1.5fr_1fr] sm:items-center"
-              >
-                <div className="flex flex-col">
+            </CardContent>
+            {sortedCashiers.length > 0 && (
+              <CardFooter className="justify-between text-sm text-muted-foreground">
+                <span>
+                  {sortedCashiers.length}{" "}
+                  {sortedCashiers.length === 1 ? "cajero activo" : "cajeros activos"}
+                </span>
+                <span className="flex items-center gap-1">
+                  Total 30d:
                   <span className="font-medium text-foreground">
-                    {member.name}
+                    {currency.format(totalCashierVolume)}
                   </span>
-                  <span className="text-muted-foreground">@{member.username}</span>
-                </div>
-                <span className="text-muted-foreground">{member.role}</span>
-                <span className="text-muted-foreground">
-                  {dateFormatter.format(new Date(member.lastActive))}
                 </span>
-                <span className="text-right font-medium text-foreground">
-                  {member.activeDeals}
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-        <CardFooter className="justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Users className="size-4" />
-            {teamMembers.length} compañeros de equipo incorporados
-          </div>
-          <div className="flex items-center gap-2">
-            <CircleDollarSign className="size-4" />
-            {currency.format(
-              clients.reduce((acc, client) => acc + client.monthlyValue, 0),
-            )}{" "}
-            en ingresos gestionados
-          </div>
-        </CardFooter>
-      </Card>
+              </CardFooter>
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
