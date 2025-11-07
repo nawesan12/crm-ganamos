@@ -2,7 +2,11 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { PaymentMethod, TransactionType } from "@/generated/prisma/enums";
+import {
+  ClientStatus,
+  PaymentMethod,
+  TransactionType,
+} from "@/generated/prisma/enums";
 
 export type MembershipTier = "Premium" | "Estándar" | "Empresarial";
 
@@ -23,6 +27,25 @@ export type ChargeLogEntry = {
   coins: number;
   timestamp: string;
   note?: string;
+};
+
+export type DailyChargeSheetRow = {
+  clientId: number;
+  username: string;
+  phone: string | null;
+  status: ClientStatus;
+  hasCharged: boolean | null;
+  checkedAt: string | null;
+  checkedById: number | null;
+  checkedByName: string | null;
+};
+
+export type DailyChargeCheckUpdate = {
+  clientId: number;
+  hasCharged: boolean;
+  checkedAt: string;
+  checkedById: number | null;
+  checkedByName: string | null;
 };
 
 function getDayRange(dateStr: string) {
@@ -146,6 +169,80 @@ export async function getCashierDashboardData(selectedDate: string) {
     ledger,
     chargeLog,
   };
+}
+
+export async function getDailyChargeSheet(selectedDate: string) {
+  const { start: dayStart } = getDayRange(selectedDate);
+
+  const clients = await prisma.client.findMany({
+    orderBy: { username: "asc" },
+    include: {
+      dailyChargeChecks: {
+        where: { date: dayStart },
+        include: { checkedBy: true },
+        take: 1,
+      },
+    },
+  });
+
+  const rows: DailyChargeSheetRow[] = clients.map((client) => {
+    const check = client.dailyChargeChecks[0];
+
+    return {
+      clientId: client.id,
+      username: client.username,
+      phone: client.phone ?? null,
+      status: client.status,
+      hasCharged: check?.hasCharged ?? null,
+      checkedAt: check?.checkedAt ? check.checkedAt.toISOString() : null,
+      checkedById: check?.checkedById ?? null,
+      checkedByName: check?.checkedBy?.name ?? null,
+    };
+  });
+
+  return rows;
+}
+
+export async function updateDailyChargeCheck(params: {
+  clientId: number;
+  hasCharged: boolean;
+  selectedDate: string;
+}) {
+  const { clientId, hasCharged, selectedDate } = params;
+
+  const cashierId = await getCurrentUserIdOrNull();
+  const { start: dayStart } = getDayRange(selectedDate);
+
+  const record = await prisma.dailyChargeCheck.upsert({
+    where: {
+      clientId_date: {
+        clientId,
+        date: dayStart,
+      },
+    },
+    create: {
+      clientId,
+      date: dayStart,
+      hasCharged,
+      checkedById: cashierId,
+    },
+    update: {
+      hasCharged,
+      checkedAt: new Date(),
+      checkedById: cashierId,
+    },
+    include: {
+      checkedBy: true,
+    },
+  });
+
+  return {
+    clientId,
+    hasCharged: record.hasCharged,
+    checkedAt: record.checkedAt.toISOString(),
+    checkedById: record.checkedById,
+    checkedByName: record.checkedBy?.name ?? null,
+  } satisfies DailyChargeCheckUpdate;
 }
 
 export async function registerCharge(params: {
