@@ -34,7 +34,7 @@ import {
   ContactChannel,
   ContactDirection,
   PaymentMethod,
-} from "@/generated/enums";
+} from "@prisma/client";
 import { listClientsAction } from "@/actions";
 import {
   createClientAction,

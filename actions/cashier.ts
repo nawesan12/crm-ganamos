@@ -2,11 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import {
-  ClientStatus,
-  PaymentMethod,
-  TransactionType,
-} from "@/generated/enums";
+import { ClientStatus, PaymentMethod, TransactionType } from "@prisma/client";
 
 export type MembershipTier = "Premium" | "Estándar" | "Empresarial";
 

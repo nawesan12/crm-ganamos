@@ -3,7 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
-import { TransactionType, UserRole } from "@/generated/enums";
+import { TransactionType, UserRole } from "@prisma/client";
 
 // ---- Tipos del dashboard (VIEW MODELS, no son el schema) ----
 
