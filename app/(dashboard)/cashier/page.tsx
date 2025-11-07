@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   CalendarClock,
   CheckCircle2,
+  CircleSlash2,
   ClipboardList,
   Coins,
   Filter,
@@ -31,13 +32,18 @@ import {
   LedgerMember,
   ChargeLogEntry,
   MembershipTier,
+  DailyChargeSheetRow,
   getCashierDashboardData,
+  getDailyChargeSheet,
   registerCharge,
+  updateDailyChargeCheck,
 } from "../../../actions/cashier";
 
 const coinFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
+
+type SheetStatusFilter = "all" | "charged" | "not-charged" | "pending";
 
 export default function CashierDashboardPage() {
   return (
@@ -52,14 +58,22 @@ function CashierDashboardContent() {
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [ledger, setLedger] = useState<LedgerMember[]>([]);
   const [chargeLog, setChargeLog] = useState<ChargeLogEntry[]>([]);
+  const [dailySheet, setDailySheet] = useState<DailyChargeSheetRow[]>([]);
   const [pendingCharges, setPendingCharges] = useState<Record<number, string>>(
     {},
   );
   const [rowFeedback, setRowFeedback] = useState<Record<number, string | null>>(
     {},
   );
+  const [sheetFeedback, setSheetFeedback] = useState<
+    Record<number, string | null>
+  >({});
+  const [sheetSaving, setSheetSaving] = useState<Record<number, boolean>>({});
   const [tierFilter, setTierFilter] = useState<"all" | MembershipTier>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [sheetSearchTerm, setSheetSearchTerm] = useState("");
+  const [sheetStatusFilter, setSheetStatusFilter] =
+    useState<SheetStatusFilter>("all");
   const [notes, setNotes] = useState(
     "Confirmar el cajón de efectivo al cierre y sincronizar los totales con finanzas antes de las 7 PM.",
   );
@@ -69,12 +83,18 @@ function CashierDashboardContent() {
   // Cargar datos cuando cambia la fecha
   useEffect(() => {
     startTransition(() => {
-      getCashierDashboardData(selectedDate)
-        .then((data) => {
+      Promise.all([
+        getCashierDashboardData(selectedDate),
+        getDailyChargeSheet(selectedDate),
+      ])
+        .then(([data, sheet]) => {
           setLedger(data.ledger);
           setChargeLog(data.chargeLog);
+          setDailySheet(sheet);
           setPendingCharges({});
           setRowFeedback({});
+          setSheetFeedback({});
+          setSheetSaving({});
         })
         .catch((error) => {
           console.error("Error loading dashboard data", error);
@@ -127,6 +147,37 @@ function CashierDashboardContent() {
       );
     });
   }, [ledger, tierFilter, searchTerm]);
+
+  const filteredDailySheet = useMemo(() => {
+    const normalized = sheetSearchTerm.trim().toLowerCase();
+
+    return dailySheet.filter((row) => {
+      if (normalized) {
+        const matchesUsername = row.username.toLowerCase().includes(normalized);
+        const matchesPhone = row.phone
+          ? row.phone.toLowerCase().includes(normalized)
+          : false;
+
+        if (!matchesUsername && !matchesPhone) {
+          return false;
+        }
+      }
+
+      if (sheetStatusFilter === "charged") {
+        return row.hasCharged === true;
+      }
+
+      if (sheetStatusFilter === "not-charged") {
+        return row.hasCharged === false;
+      }
+
+      if (sheetStatusFilter === "pending") {
+        return row.hasCharged === null;
+      }
+
+      return true;
+    });
+  }, [dailySheet, sheetSearchTerm, sheetStatusFilter]);
 
   const handleChargeSubmit = async (memberId: number) => {
     const rawValue = pendingCharges[memberId];
@@ -182,6 +233,60 @@ function CashierDashboardContent() {
         ...prev,
         [memberId]:
           "No se pudo registrar el cargo. Intente nuevamente o contacte a soporte.",
+      }));
+    }
+  };
+
+  const handleDailyCheckUpdate = async (
+    clientId: number,
+    hasCharged: boolean,
+  ) => {
+    setSheetSaving((prev) => ({
+      ...prev,
+      [clientId]: true,
+    }));
+    setSheetFeedback((prev) => ({
+      ...prev,
+      [clientId]: null,
+    }));
+
+    try {
+      const result = await updateDailyChargeCheck({
+        clientId,
+        hasCharged,
+        selectedDate,
+      });
+
+      setDailySheet((prev) =>
+        prev.map((row) =>
+          row.clientId === clientId
+            ? {
+                ...row,
+                hasCharged: result.hasCharged,
+                checkedAt: result.checkedAt,
+                checkedById: result.checkedById,
+                checkedByName: result.checkedByName,
+              }
+            : row,
+        ),
+      );
+
+      setSheetFeedback((prev) => ({
+        ...prev,
+        [clientId]: hasCharged
+          ? "Marcado como cargó hoy."
+          : "Marcado como no cargó.",
+      }));
+    } catch (error) {
+      console.error("Error al actualizar estado diario", error);
+      setSheetFeedback((prev) => ({
+        ...prev,
+        [clientId]: "No se pudo actualizar el registro. Intente nuevamente.",
+      }));
+    } finally {
+      setSheetSaving((prev) => ({
+        ...prev,
+        [clientId]: false,
       }));
     }
   };
@@ -261,145 +366,309 @@ function CashierDashboardContent() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+        <div className="space-y-6">
+          <Card className="border-border/70 bg-background/90">
+            <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Tablero de cargos diarios
+                </CardTitle>
+                <CardDescription>
+                  Capture las visitas de hoy con solo unos pocos clics. Los montos
+                  actualizan el libro mayor al instante.
+                </CardDescription>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="flex flex-col text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                  Fecha de trabajo
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(event) => setSelectedDate(event.target.value)}
+                    className="mt-1"
+                  />
+                </label>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                  <Search className="size-4 text-muted-foreground" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Buscar miembro o nivel"
+                    className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="size-4 text-muted-foreground" />
+                  <select
+                    className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+                    value={tierFilter}
+                    onChange={(event) =>
+                      setTierFilter(event.target.value as typeof tierFilter)
+                    }
+                  >
+                    <option value="all">Todos los niveles</option>
+                    <option value="Premium">Premium</option>
+                    <option value="Estándar">Estándar</option>
+                    <option value="Empresarial">Empresarial</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-border/60">
+                <div className="hidden grid-cols-[2fr_1fr_1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
+                  <span>Miembro</span>
+                  <span>Nivel</span>
+                  <span>Monedas este mes</span>
+                  <span className="text-right">Registrar cargo</span>
+                </div>
+                <div className="divide-y divide-border/60">
+                  {isPending && ledger.length === 0 ? (
+                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      Cargando datos del turno...
+                    </div>
+                  ) : filteredMembers.length === 0 ? (
+                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      Ningún miembro coincide con los filtros. Ajuste la búsqueda
+                      o el nivel.
+                    </div>
+                  ) : (
+                    filteredMembers.map((member) => (
+                      <div
+                        key={member.id}
+                        className="grid gap-4 px-4 py-4 text-sm md:grid-cols-[2fr_1fr_1fr_1.2fr] md:items-center md:px-6"
+                      >
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-medium text-foreground">
+                            {member.name}
+                          </span>
+                          {member.visitWindow && (
+                            <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                              {member.visitWindow}
+                            </span>
+                          )}
+                          {member.preferences && (
+                            <span className="text-xs text-muted-foreground">
+                              {member.preferences}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-muted-foreground">
+                          {member.membership}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {coinFormatter.format(member.coinsThisMonth)} monedas
+                        </span>
+                        <div className="flex flex-col gap-2 md:items-end">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={pendingCharges[member.id] ?? ""}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setPendingCharges((prev) => ({
+                                  ...prev,
+                                  [member.id]: value,
+                                }));
+                                if (rowFeedback[member.id]) {
+                                  setRowFeedback((prev) => ({
+                                    ...prev,
+                                    [member.id]: null,
+                                  }));
+                                }
+                              }}
+                              className="h-9 w-24 text-right"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleChargeSubmit(member.id)}
+                            >
+                              Registrar
+                            </Button>
+                          </div>
+                          {rowFeedback[member.id] && (
+                            <span className="text-xs text-muted-foreground">
+                              {rowFeedback[member.id]}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70 bg-background/90">
+            <CardHeader>
               <CardTitle className="text-xl font-semibold text-foreground">
-                Tablero de cargos diarios
+                Hoja de control diario
               </CardTitle>
               <CardDescription>
-                Capture las visitas de hoy con solo unos pocos clics. Los montos
-                actualizan el libro mayor al instante.
+                Marque quién cargó puntos en la fecha seleccionada para dejar
+                constancia al equipo administrativo.
               </CardDescription>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <label className="flex flex-col text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                Fecha de trabajo
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(event) => setSelectedDate(event.target.value)}
-                  className="mt-1"
-                />
-              </label>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                <Search className="size-4 text-muted-foreground" />
-                <Input
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Buscar miembro o nivel"
-                  className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-                />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                  <Search className="size-4 text-muted-foreground" />
+                  <Input
+                    value={sheetSearchTerm}
+                    onChange={(event) => setSheetSearchTerm(event.target.value)}
+                    placeholder="Buscar por usuario o teléfono"
+                    className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="size-4 text-muted-foreground" />
+                  <select
+                    className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+                    value={sheetStatusFilter}
+                    onChange={(event) =>
+                      setSheetStatusFilter(event.target.value as SheetStatusFilter)
+                    }
+                  >
+                    <option value="all">Todos los estados</option>
+                    <option value="charged">Marcados como cargó</option>
+                    <option value="not-charged">Marcados como no cargó</option>
+                    <option value="pending">Sin registro</option>
+                  </select>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Filter className="size-4 text-muted-foreground" />
-                <select
-                  className="h-9 rounded-md border border-border bg-background px-3 text-sm"
-                  value={tierFilter}
-                  onChange={(event) =>
-                    setTierFilter(event.target.value as typeof tierFilter)
-                  }
-                >
-                  <option value="all">Todos los niveles</option>
-                  <option value="Premium">Premium</option>
-                  <option value="Estándar">Estándar</option>
-                  <option value="Empresarial">Empresarial</option>
-                </select>
-              </div>
-            </div>
 
-            <div className="overflow-hidden rounded-xl border border-border/60">
-              <div className="hidden grid-cols-[2fr_1fr_1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
-                <span>Miembro</span>
-                <span>Nivel</span>
-                <span>Monedas este mes</span>
-                <span className="text-right">Registrar cargo</span>
-              </div>
-              <div className="divide-y divide-border/60">
-                {isPending && ledger.length === 0 ? (
-                  <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    Cargando datos del turno...
-                  </div>
-                ) : filteredMembers.length === 0 ? (
-                  <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    Ningún miembro coincide con los filtros. Ajuste la búsqueda
-                    o el nivel.
-                  </div>
-                ) : (
-                  filteredMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="grid gap-4 px-4 py-4 text-sm md:grid-cols-[2fr_1fr_1fr_1.2fr] md:items-center md:px-6"
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium text-foreground">
-                          {member.name}
-                        </span>
-                        {member.visitWindow && (
-                          <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                            {member.visitWindow}
-                          </span>
-                        )}
-                        {member.preferences && (
-                          <span className="text-xs text-muted-foreground">
-                            {member.preferences}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-muted-foreground">
-                        {member.membership}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {coinFormatter.format(member.coinsThisMonth)} monedas
-                      </span>
-                      <div className="flex flex-col gap-2 md:items-end">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={pendingCharges[member.id] ?? ""}
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              setPendingCharges((prev) => ({
-                                ...prev,
-                                [member.id]: value,
-                              }));
-                              if (rowFeedback[member.id]) {
-                                setRowFeedback((prev) => ({
-                                  ...prev,
-                                  [member.id]: null,
-                                }));
-                              }
-                            }}
-                            className="h-9 w-24 text-right"
-                          />
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleChargeSubmit(member.id)}
-                          >
-                            Registrar
-                          </Button>
-                        </div>
-                        {rowFeedback[member.id] && (
-                          <span className="text-xs text-muted-foreground">
-                            {rowFeedback[member.id]}
-                          </span>
-                        )}
-                      </div>
+              <div className="overflow-hidden rounded-xl border border-border/60">
+                <div className="hidden grid-cols-[1.6fr_1.1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
+                  <span>Cliente</span>
+                  <span>Estado del día</span>
+                  <span className="text-right">Actualizar</span>
+                </div>
+                <div className="divide-y divide-border/60">
+                  {isPending && dailySheet.length === 0 ? (
+                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      Cargando usuarios...
                     </div>
-                  ))
-                )}
+                  ) : filteredDailySheet.length === 0 ? (
+                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      Ningún usuario coincide con los filtros seleccionados.
+                    </div>
+                  ) : (
+                    filteredDailySheet.map((row) => {
+                      const statusLabel =
+                        row.hasCharged === true
+                          ? "Cobró hoy"
+                          : row.hasCharged === false
+                            ? "No cargó"
+                            : "Sin registro";
+                      const statusClasses =
+                        row.hasCharged === true
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                          : row.hasCharged === false
+                            ? "border-rose-500/30 bg-rose-500/10 text-rose-600"
+                            : "border-border/60 bg-muted/60 text-muted-foreground";
+                      const statusIcon =
+                        row.hasCharged === true ? (
+                          <CheckCircle2 className="size-3.5" />
+                        ) : row.hasCharged === false ? (
+                          <CircleSlash2 className="size-3.5" />
+                        ) : (
+                          <CalendarClock className="size-3.5" />
+                        );
+                      const lastUpdate = row.checkedAt
+                        ? new Date(row.checkedAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : null;
+
+                      return (
+                        <div
+                          key={row.clientId}
+                          className="grid gap-4 px-4 py-4 text-sm md:grid-cols-[1.6fr_1.1fr_1.2fr] md:items-center md:px-6"
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-medium text-foreground">
+                              {row.username}
+                            </span>
+                            {row.phone && (
+                              <span className="text-xs text-muted-foreground">
+                                {row.phone}
+                              </span>
+                            )}
+                            <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                              {row.status}
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusClasses}`}
+                            >
+                              {statusIcon}
+                              {statusLabel}
+                            </span>
+                            {row.checkedAt ? (
+                              <span className="text-xs text-muted-foreground">
+                                Actualizado {lastUpdate}
+                                {row.checkedByName
+                                  ? ` · ${row.checkedByName}`
+                                  : ""}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                Aún sin confirmación para esta fecha.
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2 md:items-end">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleDailyCheckUpdate(row.clientId, true)}
+                                disabled={sheetSaving[row.clientId]}
+                              >
+                                <CheckCircle2 className="mr-2 size-4" />
+                                Cobró
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDailyCheckUpdate(row.clientId, false)}
+                                disabled={sheetSaving[row.clientId]}
+                              >
+                                <CircleSlash2 className="mr-2 size-4" />
+                                No cobró
+                              </Button>
+                            </div>
+                            {sheetSaving[row.clientId] && (
+                              <span className="text-xs text-muted-foreground">
+                                Guardando cambios...
+                              </span>
+                            )}
+                            {sheetFeedback[row.clientId] && (
+                              <span className="text-xs text-muted-foreground">
+                                {sheetFeedback[row.clientId]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="space-y-6">
           <Card className="border-border/70 bg-background/90">
