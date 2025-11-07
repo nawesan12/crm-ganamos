@@ -1,34 +1,26 @@
 import { PrismaClient } from "@prisma/client";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient;
-};
+// Este bloque de código previene que se creen múltiples instancias de PrismaClient
+// en el entorno de desarrollo debido al Hot Reloading de Next.js.
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL environment variable is not set.");
+// Declaramos una variable global para almacenar la instancia de Prisma.
+declare global {
+  var prisma: PrismaClient | undefined;
 }
 
-const directUrl = process.env.DIRECT_URL;
-
+// Exportamos la instancia de Prisma.
+// Si ya existe una instancia global, la reutilizamos.
+// Si no existe, creamos una nueva.
+// En producción, 'globalThis.prisma' siempre será undefined la primera vez,
+// por lo que se creará una única instancia.
 export const prisma =
-  globalForPrisma.prisma ??
+  globalThis.prisma ||
   new PrismaClient({
-    datasources: {
-      db: {
-        url: databaseUrl,
-        ...(directUrl ? { directUrl } : {}),
-      },
-    },
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    // Opcional: puedes habilitar el logging de consultas para debugging.
+    // log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 
+// Si estamos en desarrollo, asignamos la nueva instancia a la variable global.
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+  globalThis.prisma = prisma;
 }
-
-export default prisma;
