@@ -29,9 +29,11 @@ import {
   ClientLifecycleStage,
   TeamMember,
   ClientAccount,
+  CashierSummary,
   getAdminDashboardData,
   addTeamMember,
   addClientAccount,
+  addCashier,
 } from "@/actions/admin";
 
 const currency = new Intl.NumberFormat("en-US", {
@@ -45,6 +47,10 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
+const integerFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
+
 export default function AdminDashboardPage() {
   return (
     <AuthGuard allowedRoles={["ADMIN"]}>
@@ -56,7 +62,9 @@ export default function AdminDashboardPage() {
 function AdminDashboardContent() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [clients, setClients] = useState<ClientAccount[]>([]);
-  const [isPending, startTransition] = useTransition();
+  const [cashiers, setCashiers] = useState<CashierSummary[]>([]);
+  const [isLoadingDashboard, startTransition] = useTransition();
+  const [isCreatingCashier, startCashierTransition] = useTransition();
 
   const [userForm, setUserForm] = useState<{
     name: string;
@@ -92,6 +100,13 @@ function AdminDashboardContent() {
 
   const [userMessage, setUserMessage] = useState<string | null>(null);
   const [clientMessage, setClientMessage] = useState<string | null>(null);
+  const [cashierMessage, setCashierMessage] = useState<string | null>(null);
+
+  const [cashierForm, setCashierForm] = useState({
+    name: "",
+    username: "",
+    password: "",
+  });
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -100,6 +115,7 @@ function AdminDashboardContent() {
         .then((data) => {
           setTeamMembers(data.teamMembers);
           setClients(data.clients);
+          setCashiers(data.cashiers);
         })
         .catch((error) => {
           console.error("Error loading admin dashboard data", error);
@@ -141,6 +157,25 @@ function AdminDashboardContent() {
     };
   }, [clients]);
 
+  const sortedCashiers = useMemo(() => {
+    return [...cashiers].sort((a, b) => {
+      if (b.totalChargedLast30 !== a.totalChargedLast30) {
+        return b.totalChargedLast30 - a.totalChargedLast30;
+      }
+
+      const dateA = a.lastChargeAt ? new Date(a.lastChargeAt).getTime() : 0;
+      const dateB = b.lastChargeAt ? new Date(b.lastChargeAt).getTime() : 0;
+
+      return dateB - dateA;
+    });
+  }, [cashiers]);
+
+  const totalCashierVolume = useMemo(
+    () =>
+      cashiers.reduce((acc, cashier) => acc + cashier.totalChargedLast30, 0),
+    [cashiers],
+  );
+
   const handleAddUser = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setUserMessage(null);
@@ -176,6 +211,36 @@ function AdminDashboardContent() {
         "No se pudo agregar el compañero de equipo. Intente nuevamente.",
       );
     }
+  };
+
+  const handleAddCashier = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCashierMessage(null);
+
+    if (!cashierForm.name || !cashierForm.username || !cashierForm.password) {
+      setCashierMessage(
+        "Completá nombre, usuario y contraseña temporal para crear el perfil de cajero.",
+      );
+      return;
+    }
+
+    startCashierTransition(async () => {
+      try {
+        const { teamMember, cashier } = await addCashier({
+          name: cashierForm.name.trim(),
+          username: cashierForm.username.trim(),
+          password: cashierForm.password,
+        });
+
+        setTeamMembers((prev) => [teamMember, ...prev]);
+        setCashiers((prev) => [cashier, ...prev]);
+        setCashierForm({ name: "", username: "", password: "" });
+        setCashierMessage(`${cashier.name} ahora puede operar como cajero.`);
+      } catch (error) {
+        console.error("Error adding cashier", error);
+        setCashierMessage("No se pudo crear el cajero. Intente nuevamente.");
+      }
+    });
   };
 
   const handleAddClient = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -293,7 +358,7 @@ function AdminDashboardContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {isPending && clients.length === 0 ? (
+            {isLoadingDashboard && clients.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
                 Cargando datos de cuentas...
               </div>
@@ -343,6 +408,168 @@ function AdminDashboardContent() {
               ))
             )}
           </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
+        <Card className="border-border/70 bg-background/90">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-foreground">
+              Registrar un nuevo cajero
+            </CardTitle>
+            <CardDescription>
+              Crea credenciales dedicadas para el equipo de cajas y mantené su
+              actividad centralizada.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={handleAddCashier}>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground" htmlFor="cashierName">
+                  Nombre completo
+                </label>
+                <Input
+                  id="cashierName"
+                  placeholder="p.ej. Valeria Mendoza"
+                  value={cashierForm.name}
+                  onChange={(event) =>
+                    setCashierForm((prev) => ({
+                      ...prev,
+                      name: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground" htmlFor="cashierUsername">
+                  Nombre de usuario
+                </label>
+                <Input
+                  id="cashierUsername"
+                  autoComplete="username"
+                  placeholder="valeria.mendoza"
+                  value={cashierForm.username}
+                  onChange={(event) =>
+                    setCashierForm((prev) => ({
+                      ...prev,
+                      username: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground" htmlFor="cashierPassword">
+                  Contraseña temporal
+                </label>
+                <Input
+                  id="cashierPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Asigna una clave segura"
+                  value={cashierForm.password}
+                  onChange={(event) =>
+                    setCashierForm((prev) => ({
+                      ...prev,
+                      password: event.target.value,
+                    }))
+                  }
+                  required
+                />
+              </div>
+              {cashierMessage && (
+                <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                  {cashierMessage}
+                </p>
+              )}
+              <div className="flex items-center justify-end gap-3">
+                <Button
+                  type="reset"
+                  variant="ghost"
+                  onClick={() => {
+                    setCashierForm({ name: "", username: "", password: "" });
+                    setCashierMessage(null);
+                  }}
+                >
+                  Limpiar
+                </Button>
+                <Button type="submit" className="px-6" disabled={isCreatingCashier}>
+                  {isCreatingCashier ? "Creando..." : "Crear cajero"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70 bg-background/90">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-foreground">
+              Actividad reciente de cajeros
+            </CardTitle>
+            <CardDescription>
+              Volumen de recargas y clientes atendidos durante los últimos 30
+              días.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoadingDashboard && cashiers.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                Cargando registros de cajeros...
+              </div>
+            ) : sortedCashiers.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                Todavía no hay cajeros activos. Registrá uno para comenzar a
+                medir su impacto.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/60 rounded-xl border border-border/60">
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground">
+                  <span>Cajero</span>
+                  <span>Último cargo</span>
+                  <span className="text-right">Clientes (30d)</span>
+                  <span className="text-right">Monto cargado (30d)</span>
+                </div>
+                {sortedCashiers.map((cashier) => (
+                  <div
+                    key={cashier.id}
+                    className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 px-6 py-4 text-sm text-muted-foreground"
+                  >
+                    <div className="flex flex-col text-foreground">
+                      <span className="font-medium">{cashier.name}</span>
+                      <span className="text-muted-foreground">@{cashier.username}</span>
+                    </div>
+                    <span>
+                      {cashier.lastChargeAt
+                        ? dateFormatter.format(new Date(cashier.lastChargeAt))
+                        : "Sin cargos recientes"}
+                    </span>
+                    <span className="text-right font-medium text-foreground">
+                      {integerFormatter.format(cashier.clientsServedLast30)}
+                    </span>
+                    <div className="text-right">
+                      <div className="font-medium text-foreground">
+                        {currency.format(cashier.totalChargedLast30)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {integerFormatter.format(cashier.chargesLast30)}
+                        {" "}
+                        {cashier.chargesLast30 === 1 ? "cargo" : "cargos"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="justify-between text-sm text-muted-foreground">
+            <span>
+              {sortedCashiers.length} {sortedCashiers.length === 1 ? "cajero activo" : "cajeros activos"}
+            </span>
+            <span className="flex items-center gap-1">
+              Total 30d: <span className="font-medium text-foreground">{currency.format(totalCashierVolume)}</span>
+            </span>
+          </CardFooter>
         </Card>
       </div>
 
