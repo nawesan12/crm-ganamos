@@ -10,7 +10,7 @@ export default function OperatorChatPanel() {
   const [input, setInput] = useState("");
 
   useEffect(() => {
-    socket = io("https://backend.tu-dominio.com", {
+    socket = io("https://chat-backend-cbla.onrender.com", {
       path: "/chat",
       transports: ["websocket"],
     });
