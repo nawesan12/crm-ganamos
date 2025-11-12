@@ -235,11 +235,7 @@ function AdminDashboardContent() {
       : 0;
   const atRiskCount = Math.max(totalClientsCount - healthyCount, 0);
   const healthTrendDirection =
-    totalClientsCount === 0
-      ? "neutral"
-      : healthyRatio >= 86
-        ? "up"
-        : "down";
+    totalClientsCount === 0 ? "neutral" : healthyRatio >= 86 ? "up" : "down";
   const healthTrendValue = `${healthyCount} saludables / ${atRiskCount} con seguimiento`;
 
   const avgOnboardingTime = clientMetrics.avgOnboardingTime;
@@ -279,7 +275,12 @@ function AdminDashboardContent() {
     event.preventDefault();
     setUserMessage(null);
 
-    if (!userForm.name || !userForm.username || !userForm.password || !userForm.role) {
+    if (
+      !userForm.name ||
+      !userForm.username ||
+      !userForm.password ||
+      !userForm.role
+    ) {
       setUserMessage(
         "Completá nombre, usuario, contraseña y rol antes de crear el perfil.",
       );
@@ -429,276 +430,290 @@ function AdminDashboardContent() {
   return (
     <>
       <div className="space-y-10">
-      <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
-          Sala de control de administración
-        </span>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          Operaciones de ingresos, de un vistazo
-        </h1>
-        <p className="max-w-3xl text-muted-foreground">
-          Manténgase a la vanguardia de la incorporación, el rendimiento del
-          equipo y la salud del cliente. Use el menú flotante de acciones para
-          ejecutar tareas comunes sin saturar la vista principal.
-        </p>
-      </div>
+        <div className="flex flex-col gap-3">
+          <span className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
+            Sala de control de administración
+          </span>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+            Operaciones de ingresos, de un vistazo
+          </h1>
+          <p className="max-w-3xl text-muted-foreground">
+            Manténgase a la vanguardia de la incorporación, el rendimiento del
+            equipo y la salud del cliente. Use el menú flotante de acciones para
+            ejecutar tareas comunes sin saturar la vista principal.
+          </p>
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          title="Ingresos recurrentes mensuales"
-          value={currency.format(totalMonthlyValue)}
-          icon={<CircleDollarSign className="size-5" />}
-          trendLabel="Comparación con 30d previos"
-          trendValue={monthlyTrendValue}
-          trendDirection={monthlyTrendDirection}
-          description="Cargos procesados durante los últimos 30 días"
-        />
-        <MetricCard
-          title="Incorporaciones activas"
-          value={`${onboardingCount}`}
-          icon={<CalendarPlus className="size-5" />}
-          trendLabel="Nuevos clientes (30d)"
-          trendValue={onboardingTrendValue}
-          trendDirection={onboardingTrendDirection}
-          description={`Clientes en incorporación activa • Pipeline ${currency.format(onboardingPipelineValue)}`}
-        />
-        <MetricCard
-          title="Cuentas saludables"
-          value={`${healthyRatio}%`}
-          icon={<BadgeCheck className="size-5" />}
-          trendLabel="Distribución actual"
-          trendValue={healthTrendValue}
-          trendDirection={healthTrendDirection}
-          description="Cuentas marcadas como saludables según actividad reciente"
-        />
-        <MetricCard
-          title="Tiempo promedio de puesta en marcha"
-          value={`${avgOnboardingTime} días`}
-          icon={<Clock3 className="size-5" />}
-          trendLabel="Historial de implementación"
-          trendValue={onboardingRangeLabel}
-          trendDirection={onboardingSpeedDirection}
-          description="Seguimiento de la eficiencia desde la creación hasta la activación (objetivo: < 14 días)"
-        />
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            title="Ingresos recurrentes mensuales"
+            value={currency.format(totalMonthlyValue)}
+            icon={<CircleDollarSign className="size-5" />}
+            trendLabel="Comparación con 30d previos"
+            trendValue={monthlyTrendValue}
+            trendDirection={monthlyTrendDirection}
+            description="Cargos procesados durante los últimos 30 días"
+          />
+          <MetricCard
+            title="Incorporaciones activas"
+            value={`${onboardingCount}`}
+            icon={<CalendarPlus className="size-5" />}
+            trendLabel="Nuevos clientes (30d)"
+            trendValue={onboardingTrendValue}
+            trendDirection={onboardingTrendDirection}
+            description={`Clientes en incorporación activa • Pipeline ${currency.format(onboardingPipelineValue)}`}
+          />
+          <MetricCard
+            title="Cuentas saludables"
+            value={`${healthyRatio}%`}
+            icon={<BadgeCheck className="size-5" />}
+            trendLabel="Distribución actual"
+            trendValue={healthTrendValue}
+            trendDirection={healthTrendDirection}
+            description="Cuentas marcadas como saludables según actividad reciente"
+          />
+          <MetricCard
+            title="Tiempo promedio de puesta en marcha"
+            value={`${avgOnboardingTime} días`}
+            icon={<Clock3 className="size-5" />}
+            trendLabel="Historial de implementación"
+            trendValue={onboardingRangeLabel}
+            trendDirection={onboardingSpeedDirection}
+            description="Seguimiento de la eficiencia desde la creación hasta la activación (objetivo: < 14 días)"
+          />
+        </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-        <div className="space-y-6">
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-foreground">
-                Cola de incorporación del equipo
-              </CardTitle>
-              <CardDescription>
-                Cuentas de mayor valor en la parte superior para enfocar los
-                recursos de implementación.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {isLoadingDashboard && clients.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                  Cargando datos de cuentas...
-                </div>
-              ) : onboardingQueue.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                  No hay cuentas en proceso de incorporación en este momento.
-                  Agregue un nuevo cliente para comenzar.
-                </div>
-              ) : (
-                onboardingQueue.map((client) => (
-                  <div
-                    key={client.id}
-                    className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/80 p-5 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="text-lg font-medium text-foreground">
-                        {client.company}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {client.poc} • {client.email}
-                      </span>
-                      {client.notes && (
-                        <p className="text-sm text-muted-foreground">
-                          {client.notes}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex w-full items-center justify-end gap-6 text-sm sm:w-auto">
-                      <div className="flex flex-col items-end">
-                        <span className="font-medium text-foreground">
-                          {currency.format(client.monthlyValue)}
-                        </span>
-                        <span className="text-muted-foreground">
-                          Valor potencial
-                        </span>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="font-medium text-foreground">
-                          {client.onboardingDays} días
-                        </span>
-                        <span className="text-muted-foreground">
-                          En incorporación
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+        <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
+          <div className="space-y-6">
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader>
                 <CardTitle className="text-xl font-semibold text-foreground">
-                  Resumen de rendimiento del equipo
+                  Cola de incorporación del equipo
                 </CardTitle>
                 <CardDescription>
-                  Supervise la carga de acuerdos y la actividad de participación
-                  por compañero de equipo.
+                  Cuentas de mayor valor en la parte superior para enfocar los
+                  recursos de implementación.
                 </CardDescription>
-              </div>
-              <Button variant="outline" className="px-4">
-                Exportar CSV
-              </Button>
-            </CardHeader>
-            <CardContent className="overflow-hidden rounded-xl border border-border/60">
-              <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_1fr] bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground sm:grid">
-                <span>Compañero de equipo</span>
-                <span>Rol</span>
-                <span>Última vez activo</span>
-                <span className="text-right">Acuerdos activos</span>
-              </div>
-              <div className="divide-y divide-border/60">
-                {teamMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="grid gap-4 px-6 py-4 text-sm sm:grid-cols-[2fr_1.5fr_1.5fr_1fr] sm:items-center"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium text-foreground">
-                        {member.name}
-                      </span>
-                      <span className="text-muted-foreground">@{member.username}</span>
-                    </div>
-                    <span className="text-muted-foreground">{member.role}</span>
-                    <span className="text-muted-foreground">
-                      {dateFormatter.format(new Date(member.lastActive))}
-                    </span>
-                    <span className="text-right font-medium text-foreground">
-                      {member.activeDeals}
-                    </span>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {isLoadingDashboard && clients.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                    Cargando datos de cuentas...
                   </div>
-                ))}
-              </div>
-            </CardContent>
-            <CardFooter className="justify-between text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Users className="size-4" />
-                {teamMembers.length} compañeros de equipo incorporados
-              </div>
-              <div className="flex items-center gap-2">
-                <CircleDollarSign className="size-4" />
-                {currency.format(
-                  clients.reduce((acc, client) => acc + client.monthlyValue, 0),
-                )}{" "}
-                en ingresos gestionados
-              </div>
-            </CardFooter>
-          </Card>
-        </div>
+                ) : onboardingQueue.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                    No hay cuentas en proceso de incorporación en este momento.
+                    Agregue un nuevo cliente para comenzar.
+                  </div>
+                ) : (
+                  onboardingQueue.map((client) => (
+                    <div
+                      key={client.id}
+                      className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/80 p-5 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span className="text-lg font-medium text-foreground">
+                          {client.company}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {client.poc} • {client.email}
+                        </span>
+                        {client.notes && (
+                          <p className="text-sm text-muted-foreground">
+                            {client.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex w-full items-center justify-end gap-6 text-sm sm:w-auto">
+                        <div className="flex flex-col items-end">
+                          <span className="font-medium text-foreground">
+                            {currency.format(client.monthlyValue)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Valor potencial
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="font-medium text-foreground">
+                            {client.onboardingDays} días
+                          </span>
+                          <span className="text-muted-foreground">
+                            En incorporación
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
 
-        <div className="space-y-6">
-          <Card className="border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-foreground">
-                Actividad reciente de cajeros
-              </CardTitle>
-              <CardDescription>
-                {cashiers.length === 0
-                  ? "Todavía no hay cajeros activos."
-                  : `${cashiers.length} cajeros activos • ${currency.format(totalCashierVolume)} recaudados en 30 días.`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoadingDashboard && cashiers.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                  Cargando registros de cajeros...
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-xl font-semibold text-foreground">
+                    Resumen de rendimiento del equipo
+                  </CardTitle>
+                  <CardDescription>
+                    Supervise la carga de acuerdos y la actividad de
+                    participación por compañero de equipo.
+                  </CardDescription>
                 </div>
-              ) : sortedCashiers.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
-                  Todavía no hay cajeros activos. Registrá uno para comenzar a
-                  operar.
+                <Button variant="outline" className="px-4">
+                  Exportar CSV
+                </Button>
+              </CardHeader>
+              <CardContent className="overflow-hidden rounded-xl border border-border/60">
+                <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_1fr] bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground sm:grid">
+                  <span>Compañero de equipo</span>
+                  <span>Rol</span>
+                  <span>Última vez activo</span>
+                  <span className="text-right">Acuerdos activos</span>
                 </div>
-              ) : (
-                sortedCashiers.map((cashier) => (
-                  <div
-                    key={cashier.id}
-                    className="space-y-4 rounded-xl border border-border/60 bg-background/80 p-5"
-                  >
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-lg font-medium text-foreground">
-                          {cashier.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          @{cashier.username}
-                        </p>
+                <div className="divide-y divide-border/60">
+                  {teamMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="grid gap-4 px-6 py-4 text-sm sm:grid-cols-[2fr_1.5fr_1.5fr_1fr] sm:items-center"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">
+                          {member.name}
+                        </span>
+                        <span className="text-muted-foreground">
+                          @{member.username}
+                        </span>
                       </div>
-                      <span className="text-sm text-muted-foreground">
-                        Último cargo {cashier.lastChargeAt
-                          ? dateFormatter.format(new Date(cashier.lastChargeAt))
-                          : "sin registrar"}
+                      <span className="text-muted-foreground">
+                        {member.role}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {dateFormatter.format(new Date(member.lastActive))}
+                      </span>
+                      <span className="text-right font-medium text-foreground">
+                        {member.activeDeals}
                       </span>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-lg bg-muted/40 p-3">
-                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                          Clientes (30d)
-                        </p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {integerFormatter.format(cashier.clientsServedLast30)}
-                        </p>
+                  ))}
+                </div>
+              </CardContent>
+              <CardFooter className="justify-between text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Users className="size-4" />
+                  {teamMembers.length} compañeros de equipo incorporados
+                </div>
+                <div className="flex items-center gap-2">
+                  <CircleDollarSign className="size-4" />
+                  {currency.format(
+                    clients.reduce(
+                      (acc, client) => acc + client.monthlyValue,
+                      0,
+                    ),
+                  )}{" "}
+                  en ingresos gestionados
+                </div>
+              </CardFooter>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Actividad reciente de cajeros
+                </CardTitle>
+                <CardDescription>
+                  {cashiers.length === 0
+                    ? "Todavía no hay cajeros activos."
+                    : `${cashiers.length} cajeros activos • ${currency.format(totalCashierVolume)} recaudados en 30 días.`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isLoadingDashboard && cashiers.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                    Cargando registros de cajeros...
+                  </div>
+                ) : sortedCashiers.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                    Todavía no hay cajeros activos. Registrá uno para comenzar a
+                    operar.
+                  </div>
+                ) : (
+                  sortedCashiers.map((cashier) => (
+                    <div
+                      key={cashier.id}
+                      className="space-y-4 rounded-xl border border-border/60 bg-background/80 p-5"
+                    >
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-lg font-medium text-foreground">
+                            {cashier.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            @{cashier.username}
+                          </p>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          Último cargo{" "}
+                          {cashier.lastChargeAt
+                            ? dateFormatter.format(
+                                new Date(cashier.lastChargeAt),
+                              )
+                            : "sin registrar"}
+                        </span>
                       </div>
-                      <div className="rounded-lg bg-muted/40 p-3">
-                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                          Cargos (30d)
-                        </p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {integerFormatter.format(cashier.chargesLast30)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/40 p-3">
-                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                          Monto cargado
-                        </p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {currency.format(cashier.totalChargedLast30)}
-                        </p>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                            Clientes (30d)
+                          </p>
+                          <p className="text-lg font-semibold text-foreground">
+                            {integerFormatter.format(
+                              cashier.clientsServedLast30,
+                            )}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                            Cargos (30d)
+                          </p>
+                          <p className="text-lg font-semibold text-foreground">
+                            {integerFormatter.format(cashier.chargesLast30)}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                            Monto cargado
+                          </p>
+                          <p className="text-lg font-semibold text-foreground">
+                            {currency.format(cashier.totalChargedLast30)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-            {sortedCashiers.length > 0 && (
-              <CardFooter className="justify-between text-sm text-muted-foreground">
-                <span>
-                  {sortedCashiers.length}{" "}
-                  {sortedCashiers.length === 1 ? "cajero activo" : "cajeros activos"}
-                </span>
-                <span className="flex items-center gap-1">
-                  Total 30d:
-                  <span className="font-medium text-foreground">
-                    {currency.format(totalCashierVolume)}
+                  ))
+                )}
+              </CardContent>
+              {sortedCashiers.length > 0 && (
+                <CardFooter className="justify-between text-sm text-muted-foreground">
+                  <span>
+                    {sortedCashiers.length}{" "}
+                    {sortedCashiers.length === 1
+                      ? "cajero activo"
+                      : "cajeros activos"}
                   </span>
-                </span>
-              </CardFooter>
-            )}
-          </Card>
+                  <span className="flex items-center gap-1">
+                    Total 30d:
+                    <span className="font-medium text-foreground">
+                      {currency.format(totalCashierVolume)}
+                    </span>
+                  </span>
+                </CardFooter>
+              )}
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
 
       {/* Floating quick actions menu */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
@@ -742,9 +757,15 @@ function AdminDashboardContent() {
           size="icon-lg"
           className="rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:bg-primary/90 focus-visible:ring-ring"
           onClick={() => setIsQuickMenuOpen((prev) => !prev)}
-          aria-label={isQuickMenuOpen ? "Cerrar acciones rápidas" : "Abrir acciones rápidas"}
+          aria-label={
+            isQuickMenuOpen
+              ? "Cerrar acciones rápidas"
+              : "Abrir acciones rápidas"
+          }
         >
-          <Plus className={`size-5 transition-transform ${isQuickMenuOpen ? "rotate-45" : ""}`} />
+          <Plus
+            className={`size-5 transition-transform ${isQuickMenuOpen ? "rotate-45" : ""}`}
+          />
         </Button>
       </div>
 
@@ -754,13 +775,17 @@ function AdminDashboardContent() {
           <DialogHeader className="space-y-1">
             <DialogTitle>Invitar un nuevo compañero de equipo</DialogTitle>
             <DialogDescription>
-              Asigne credenciales temporales y defina su estado inicial para sumarlo al frente comercial.
+              Asigne credenciales temporales y defina su estado inicial para
+              sumarlo al frente comercial.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleAddUser}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="name">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="name"
+                >
                   Nombre completo
                 </label>
                 <Input
@@ -777,7 +802,10 @@ function AdminDashboardContent() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="username">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="username"
+                >
                   Nombre de usuario
                 </label>
                 <Input
@@ -796,7 +824,10 @@ function AdminDashboardContent() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="password">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="password"
+              >
                 Contraseña temporal
               </label>
               <Input
@@ -816,7 +847,10 @@ function AdminDashboardContent() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="role">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="role"
+                >
                   Rol dentro del equipo
                 </label>
                 <Input
@@ -833,7 +867,10 @@ function AdminDashboardContent() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="status">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="status"
+                >
                   Estado de preparación
                 </label>
                 <select
@@ -854,7 +891,9 @@ function AdminDashboardContent() {
               </div>
             </div>
             {userMessage && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">{userMessage}</p>
+              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                {userMessage}
+              </p>
             )}
             <DialogFooter className="pt-2">
               <Button
@@ -887,13 +926,17 @@ function AdminDashboardContent() {
           <DialogHeader className="space-y-1">
             <DialogTitle>Registrar cuenta de cliente</DialogTitle>
             <DialogDescription>
-              Capturá los datos clave de incorporación para coordinar al equipo de éxito.
+              Capturá los datos clave de incorporación para coordinar al equipo
+              de éxito.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleAddClient}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="company">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="company"
+                >
                   Nombre de la empresa
                 </label>
                 <Input
@@ -910,7 +953,10 @@ function AdminDashboardContent() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="poc">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="poc"
+                >
                   Punto de contacto
                 </label>
                 <Input
@@ -927,7 +973,10 @@ function AdminDashboardContent() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="clientEmail">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="clientEmail"
+                >
                   Correo electrónico de contacto
                 </label>
                 <Input
@@ -945,7 +994,10 @@ function AdminDashboardContent() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="stage">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="stage"
+                >
                   Etapa del ciclo de vida
                 </label>
                 <select
@@ -965,7 +1017,10 @@ function AdminDashboardContent() {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="monthlyValue">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="monthlyValue"
+                >
                   Valor mensual (USD)
                 </label>
                 <Input
@@ -982,7 +1037,10 @@ function AdminDashboardContent() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="onboardingDays">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="onboardingDays"
+                >
                   Días en incorporación
                 </label>
                 <Input
@@ -1000,7 +1058,10 @@ function AdminDashboardContent() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="notes">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="notes"
+              >
                 Notas internas
               </label>
               <Textarea
@@ -1017,7 +1078,9 @@ function AdminDashboardContent() {
               />
             </div>
             {clientMessage && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">{clientMessage}</p>
+              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                {clientMessage}
+              </p>
             )}
             <DialogFooter className="pt-2">
               <Button
@@ -1047,17 +1110,24 @@ function AdminDashboardContent() {
       </Dialog>
 
       {/* Cashier dialog */}
-      <Dialog open={isCashierDialogOpen} onOpenChange={handleCashierDialogChange}>
+      <Dialog
+        open={isCashierDialogOpen}
+        onOpenChange={handleCashierDialogChange}
+      >
         <DialogContent className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
           <DialogHeader className="space-y-1">
             <DialogTitle>Crear perfil de cajero</DialogTitle>
             <DialogDescription>
-              Generá credenciales puntuales para habilitar cobros en punto de venta.
+              Generá credenciales puntuales para habilitar cobros en punto de
+              venta.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleAddCashier}>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="cashierName">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="cashierName"
+              >
                 Nombre completo
               </label>
               <Input
@@ -1074,7 +1144,10 @@ function AdminDashboardContent() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="cashierUsername">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="cashierUsername"
+              >
                 Nombre de usuario
               </label>
               <Input
@@ -1092,7 +1165,10 @@ function AdminDashboardContent() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="cashierPassword">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="cashierPassword"
+              >
                 Contraseña temporal
               </label>
               <Input
@@ -1111,7 +1187,9 @@ function AdminDashboardContent() {
               />
             </div>
             {cashierMessage && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">{cashierMessage}</p>
+              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                {cashierMessage}
+              </p>
             )}
             <DialogFooter className="pt-2">
               <Button
@@ -1124,7 +1202,11 @@ function AdminDashboardContent() {
               >
                 Limpiar
               </Button>
-              <Button type="submit" className="px-6" disabled={isCreatingCashier}>
+              <Button
+                type="submit"
+                className="px-6"
+                disabled={isCreatingCashier}
+              >
                 {isCreatingCashier ? "Creando..." : "Crear cajero"}
               </Button>
             </DialogFooter>
