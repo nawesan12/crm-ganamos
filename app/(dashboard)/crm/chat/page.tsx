@@ -1,5 +1,10 @@
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import OperatorChatPanel from "@/components/OperatorChatPanel";
 
 export default function ChatsPage() {
-  return <OperatorChatPanel />;
+  return (
+    <AuthGuard allowedRoles={["ADMIN"]}>
+      <OperatorChatPanel />
+    </AuthGuard>
+  );
 }
