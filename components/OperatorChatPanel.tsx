@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
 // ---------------- TYPES ----------------
-// (Types are unchanged)
+
 interface Message {
   from: "client" | "operator";
-  text: string;
+  text?: string;
+  image?: string; // 🆕 base64 / data URL
+  mimeType?: string; // 🆕 opcional
+  name?: string; // 🆕 nombre de archivo
   timestamp?: string;
 }
 
@@ -16,7 +19,7 @@ interface Chat {
   username: string;
   messages: Message[];
   unread: number;
-  isClientTypFing?: boolean;
+  isClientTyping?: boolean;
 }
 
 interface NewChatPayload {
@@ -26,7 +29,12 @@ interface NewChatPayload {
 
 interface IncomingMessagePayload {
   from: string; // clientId
-  message: string;
+  type: "text" | "image";
+  message?: string;
+  image?: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
 }
 
 interface TypingPayload {
@@ -46,8 +54,8 @@ export default function OperatorChatPanel() {
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null); // 🆕 para imágenes
 
-  // (All hooks and logic are unchanged)
   const activeClientIdRef = useRef<string | null>(null);
   useEffect(() => {
     activeClientIdRef.current = activeClientId;
@@ -112,28 +120,38 @@ export default function OperatorChatPanel() {
       });
     });
 
+    // 🆕 Soporte texto + imagen del cliente
     s.on("incomingMessage", (data: IncomingMessagePayload) => {
       setChats((prev) =>
-        prev.map((c) =>
-          c.clientId === data.from
-            ? {
-                ...c,
-                messages: [
-                  ...c.messages,
-                  {
-                    from: "client",
-                    text: data.message,
-                    timestamp: new Date().toISOString(),
-                  },
-                ],
-                unread:
-                  activeClientIdRef.current === data.from
-                    ? c.unread
-                    : c.unread + 1,
-                isClientTyping: false,
-              }
-            : c,
-        ),
+        prev.map((c) => {
+          if (c.clientId !== data.from) return c;
+
+          const base = {
+            from: "client" as const,
+            timestamp: new Date().toISOString(),
+          };
+
+          const newMsg: Message =
+            data.type === "image" && data.image
+              ? {
+                  ...base,
+                  image: data.image,
+                  mimeType: data.mimeType,
+                  name: data.name,
+                }
+              : {
+                  ...base,
+                  text: data.message ?? "",
+                };
+
+          return {
+            ...c,
+            messages: [...c.messages, newMsg],
+            unread:
+              activeClientIdRef.current === data.from ? c.unread : c.unread + 1,
+            isClientTyping: false,
+          };
+        }),
       );
     });
 
@@ -203,12 +221,14 @@ export default function OperatorChatPanel() {
     }, 1500);
   };
 
+  // 🆕 Enviar mensaje de TEXTO
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !activeChat || !socketRef.current) return;
 
     socketRef.current.emit("operatorMessage", {
       to: activeChat.clientId,
+      type: "text",
       message: input,
     });
 
@@ -239,6 +259,66 @@ export default function OperatorChatPanel() {
     setInput("");
   };
 
+  // 🆕 Click en botón de adjuntar imagen
+  const handleImageButtonClick = () => {
+    if (!activeChat) return;
+    fileInputRef.current?.click();
+  };
+
+  // 🆕 Cuando el operador elige una imagen
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Solo podés enviar imágenes.");
+      e.target.value = "";
+      return;
+    }
+
+    if (!socketRef.current || !activeChat) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+
+      // Emitir al servidor
+      socketRef.current?.emit("operatorMessage", {
+        to: activeChat.clientId,
+        type: "image",
+        image: base64,
+        name: file.name,
+        mimeType: file.type,
+        size: file.size,
+      });
+
+      // Agregar al chat local
+      setChats((prev) =>
+        prev.map((c) =>
+          c.clientId === activeChat.clientId
+            ? {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  {
+                    from: "operator",
+                    image: base64,
+                    mimeType: file.type,
+                    name: file.name,
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+              }
+            : c,
+        ),
+      );
+
+      e.target.value = "";
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const statusLabel =
     connectionStatus === "connected"
       ? "Conectado"
@@ -253,15 +333,12 @@ export default function OperatorChatPanel() {
         ? "bg-yellow-400"
         : "bg-red-500";
 
-  // ---------------- STYLES MODIFIED BELOW ----------------
+  // ---------------- RENDER ----------------
 
   return (
-    // --- MODIFIED: Base is now a warm, light gray. Larger base text ---
     <div className="flex h-screen bg-neutral-100 text-base text-neutral-800">
       {/* Sidebar */}
-      {/* --- MODIFIED: Fixed width, white BG, warmer border color --- */}
       <aside className="w-80 bg-white border-r border-neutral-200 flex flex-col overflow-y-auto">
-        {/* --- MODIFIED: More padding, larger text --- */}
         <div className="flex items-center justify-between p-6 border-b border-neutral-200">
           <h2 className="font-semibold text-xl text-neutral-900">
             Chats activos
@@ -278,19 +355,20 @@ export default function OperatorChatPanel() {
           </p>
         )}
 
-        {/* --- MODIFIED: More padding around the list --- */}
         <div className="flex-1 overflow-y-auto p-3">
           {chats.map((c) => {
             const isActive = activeClientId === c.clientId;
             const lastMessage =
-              c.messages[c.messages.length - 1]?.text || "Nuevo chat";
+              c.messages[c.messages.length - 1]?.text ||
+              (c.messages[c.messages.length - 1]?.image
+                ? "📷 Imagen"
+                : "Nuevo chat");
 
             return (
               <button
                 key={c.clientId}
                 type="button"
                 onClick={() => handleSelectChat(c.clientId)}
-                /* --- MODIFIED: Warmer colors, "glow" shadow on active --- */
                 className={`w-full text-left p-4 rounded-xl cursor-pointer transition-all mb-1.5 ${
                   isActive
                     ? "bg-[#3DAB42] text-white shadow-lg shadow-green-500/20"
@@ -334,11 +412,9 @@ export default function OperatorChatPanel() {
       </aside>
 
       {/* Chat Window */}
-      {/* --- MODIFIED: Softer bg-neutral-50 --- */}
       <main className="flex-1 flex flex-col bg-neutral-50">
         {activeChat ? (
           <>
-            {/* --- MODIFIED: More padding, subtle shadow --- */}
             <header className="flex items-center justify-between p-6 bg-white border-b border-neutral-200 shadow-sm">
               <div>
                 <div className="font-semibold text-neutral-900 text-lg">
@@ -353,35 +429,62 @@ export default function OperatorChatPanel() {
               </div>
             </header>
 
-            {/* --- MODIFIED: bg-neutral-100 to match page, more space --- */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-100">
-              {activeChat.messages.map((m, i) => (
-                <div
-                  key={i}
-                  /* --- MODIFIED: "Bubbly" (rounded-2xl) + asymmetric radius + "glow" --- */
-                  className={`p-4 rounded-2xl max-w-[75%] break-words text-sm ${
-                    m.from === "operator"
-                      ? "bg-[#3DAB42] text-white ml-auto shadow-lg shadow-green-600/20 rounded-br-lg"
-                      : "bg-white text-neutral-800 mr-auto shadow-sm border border-neutral-200 rounded-bl-lg"
-                  }`}
-                >
-                  {m.text}
-                  {m.timestamp && (
-                    <span
-                      className={`block text-[11px] mt-2 text-right ${
-                        m.from === "operator"
-                          ? "text-white/90"
-                          : "text-neutral-400"
+              {activeChat.messages.map((m, i) => {
+                const isOperator = m.from === "operator";
+
+                return (
+                  <div
+                    key={i}
+                    className={`max-w-[75%] ${
+                      isOperator ? "ml-auto" : "mr-auto"
+                    }`}
+                  >
+                    <div
+                      className={`p-4 rounded-2xl break-words text-sm ${
+                        isOperator
+                          ? "bg-[#3DAB42] text-white shadow-lg shadow-green-600/20 rounded-br-lg"
+                          : "bg-white text-neutral-800 shadow-sm border border-neutral-200 rounded-bl-lg"
                       }`}
                     >
-                      {new Date(m.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  )}
-                </div>
-              ))}
+                      {/* 🆕 Render imagen si existe */}
+                      {m.image && (
+                        <div className="mb-2">
+                          <img
+                            src={m.image}
+                            alt={m.name || "Imagen"}
+                            className="rounded-lg max-h-64 w-auto cursor-pointer"
+                            onClick={() => {
+                              window.open(m.image, "_blank");
+                            }}
+                          />
+                          {m.name && (
+                            <div className="mt-1 text-[11px] opacity-80">
+                              {m.name}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Texto si hay */}
+                      {m.text && <div>{m.text}</div>}
+
+                      {m.timestamp && (
+                        <span
+                          className={`block text-[11px] mt-2 text-right ${
+                            isOperator ? "text-white/90" : "text-neutral-400"
+                          }`}
+                        >
+                          {new Date(m.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
 
               {activeChat.isClientTyping && (
                 <div className="mr-auto text-sm text-neutral-500 italic">
@@ -392,11 +495,30 @@ export default function OperatorChatPanel() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* --- MODIFIED: New input/button layout --- */}
+            {/* Input + botones */}
             <form
               onSubmit={sendMessage}
-              className="flex items-center gap-4 border-t border-neutral-200 bg-white p-4"
+              className="flex items-center gap-3 border-t border-neutral-200 bg-white p-4"
             >
+              {/* 🆕 Botón imagen */}
+              <button
+                type="button"
+                onClick={handleImageButtonClick}
+                className="h-12 w-12 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-xl hover:bg-neutral-200 transition-all"
+                title="Enviar imagen"
+              >
+                📎
+              </button>
+
+              {/* 🆕 Input file oculto */}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
               <input
                 className="flex-1 p-4 outline-none text-neutral-800 bg-neutral-100 rounded-xl border border-neutral-200 transition-all focus:bg-white focus:ring-2 focus:ring-[#3DAB42]"
                 placeholder="Escribí tu mensaje..."
@@ -406,16 +528,13 @@ export default function OperatorChatPanel() {
               <button
                 type="submit"
                 className="bg-[#3DAB42] text-white rounded-xl h-14 w-14 flex items-center justify-center text-2xl font-semibold transition-all hover:bg-green-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={
-                  !connectionStatus || connectionStatus === "disconnected"
-                }
+                disabled={connectionStatus === "disconnected"}
               >
                 ➤
               </button>
             </form>
           </>
         ) : (
-          /* --- MODIFIED: Warmer empty state --- */
           <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 bg-neutral-50">
             <span
               className="text-7xl mb-4"
