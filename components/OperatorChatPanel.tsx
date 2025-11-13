@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
 // ---------------- TYPES ----------------
-
+// (Types are unchanged)
 interface Message {
   from: "client" | "operator";
   text: string;
@@ -16,7 +16,7 @@ interface Chat {
   username: string;
   messages: Message[];
   unread: number;
-  isClientTyping?: boolean;
+  isClientTypFing?: boolean;
 }
 
 interface NewChatPayload {
@@ -47,13 +47,12 @@ export default function OperatorChatPanel() {
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Para tener siempre el clientId activo más reciente dentro de los handlers del socket
+  // (All hooks and logic are unchanged)
   const activeClientIdRef = useRef<string | null>(null);
   useEffect(() => {
     activeClientIdRef.current = activeClientId;
   }, [activeClientId]);
 
-  // Timeout para cortar el estado "escribiendo" del operador
   const operatorTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -64,14 +63,12 @@ export default function OperatorChatPanel() {
       ? (chats.find((c) => c.clientId === activeClientId) ?? null)
       : null;
 
-  // Auto scroll to bottom when active chat messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [activeChat?.messages.length]);
 
-  // Socket setup
   useEffect(() => {
     const s = io("https://chat-backend-cbla.onrender.com", {
       path: "/chat",
@@ -97,7 +94,6 @@ export default function OperatorChatPanel() {
       setConnectionStatus("disconnected");
     });
 
-    // When a new chat starts from a client
     s.on("newChat", (data: NewChatPayload) => {
       setChats((prev) => {
         const exists = prev.some((c) => c.clientId === data.clientId);
@@ -108,7 +104,6 @@ export default function OperatorChatPanel() {
           { ...data, messages: [], unread: 0, isClientTyping: false },
         ];
 
-        // Si no hay chat activo, seleccionamos el primero que llega
         if (!activeClientIdRef.current && updated.length > 0) {
           setActiveClientId(data.clientId);
         }
@@ -117,7 +112,6 @@ export default function OperatorChatPanel() {
       });
     });
 
-    // When a client sends a message
     s.on("incomingMessage", (data: IncomingMessagePayload) => {
       setChats((prev) =>
         prev.map((c) =>
@@ -136,7 +130,6 @@ export default function OperatorChatPanel() {
                   activeClientIdRef.current === data.from
                     ? c.unread
                     : c.unread + 1,
-                // Cuando llega un mensaje, asumimos que dejó de escribir
                 isClientTyping: false,
               }
             : c,
@@ -144,7 +137,6 @@ export default function OperatorChatPanel() {
       );
     });
 
-    // Cliente está escribiendo
     s.on("clientTyping", (data: TypingPayload) => {
       setChats((prev) =>
         prev.map((c) =>
@@ -155,7 +147,6 @@ export default function OperatorChatPanel() {
       );
     });
 
-    // Optional: handle disconnections or chat end events
     s.on("chatEnded", ({ clientId }: { clientId: string }) => {
       setChats((prev) => prev.filter((c) => c.clientId !== clientId));
       if (activeClientIdRef.current === clientId) setActiveClientId(null);
@@ -174,7 +165,6 @@ export default function OperatorChatPanel() {
 
   const handleSelectChat = (clientId: string) => {
     setActiveClientId(clientId);
-    // limpiar no leídos del chat seleccionado
     setChats((prev) =>
       prev.map((c) => (c.clientId === clientId ? { ...c, unread: 0 } : c)),
     );
@@ -195,7 +185,6 @@ export default function OperatorChatPanel() {
     const value = e.target.value;
     setInput(value);
 
-    // Notificar "escribiendo" al cliente
     const socket = socketRef.current;
     if (!socket || !activeClientIdRef.current) return;
 
@@ -204,7 +193,6 @@ export default function OperatorChatPanel() {
       notifyOperatorTyping(true);
     }
 
-    // Reiniciamos el timeout cada vez que escribe
     if (operatorTypingTimeoutRef.current) {
       clearTimeout(operatorTypingTimeoutRef.current);
     }
@@ -242,7 +230,6 @@ export default function OperatorChatPanel() {
       ),
     );
 
-    // Al enviar mensaje, cortamos el estado "escribiendo"
     if (operatorTypingTimeoutRef.current) {
       clearTimeout(operatorTypingTimeoutRef.current);
     }
@@ -266,25 +253,33 @@ export default function OperatorChatPanel() {
         ? "bg-yellow-400"
         : "bg-red-500";
 
+  // ---------------- STYLES MODIFIED BELOW ----------------
+
   return (
-    <div className="flex h-screen bg-gray-100 text-sm">
+    // --- MODIFIED: Base is now a warm, light gray. Larger base text ---
+    <div className="flex h-screen bg-neutral-100 text-base text-neutral-800">
       {/* Sidebar */}
-      <aside className="w-1/4 bg-white border-r flex flex-col overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="font-bold text-gray-700">Chats activos</h2>
-          <div className="flex items-center gap-1 text-xs text-gray-500">
+      {/* --- MODIFIED: Fixed width, white BG, warmer border color --- */}
+      <aside className="w-80 bg-white border-r border-neutral-200 flex flex-col overflow-y-auto">
+        {/* --- MODIFIED: More padding, larger text --- */}
+        <div className="flex items-center justify-between p-6 border-b border-neutral-200">
+          <h2 className="font-semibold text-xl text-neutral-900">
+            Chats activos
+          </h2>
+          <div className="flex items-center gap-1.5 text-xs text-neutral-600">
             <span className={`h-2 w-2 rounded-full ${statusDotClass}`} />
             <span>{statusLabel}</span>
           </div>
         </div>
 
         {chats.length === 0 && (
-          <p className="p-4 text-gray-400 text-center text-xs">
+          <p className="p-4 text-neutral-400 text-center text-sm">
             No hay chats activos
           </p>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        {/* --- MODIFIED: More padding around the list --- */}
+        <div className="flex-1 overflow-y-auto p-3">
           {chats.map((c) => {
             const isActive = activeClientId === c.clientId;
             const lastMessage =
@@ -295,14 +290,19 @@ export default function OperatorChatPanel() {
                 key={c.clientId}
                 type="button"
                 onClick={() => handleSelectChat(c.clientId)}
-                className={`w-full text-left p-3 cursor-pointer transition-colors border-l-4 ${
+                /* --- MODIFIED: Warmer colors, "glow" shadow on active --- */
+                className={`w-full text-left p-4 rounded-xl cursor-pointer transition-all mb-1.5 ${
                   isActive
-                    ? "bg-green-100 border-green-500"
-                    : "border-transparent hover:bg-gray-100"
+                    ? "bg-[#3DAB42] text-white shadow-lg shadow-green-500/20"
+                    : "border-transparent text-neutral-700 hover:bg-neutral-100"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-gray-800 truncate">
+                  <span
+                    className={`font-semibold truncate ${
+                      isActive ? "text-white" : "text-neutral-900"
+                    }`}
+                  >
                     {c.username}
                   </span>
                   {c.unread > 0 && (
@@ -311,11 +311,19 @@ export default function OperatorChatPanel() {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-gray-500 truncate">
+                <div
+                  className={`text-sm truncate ${
+                    isActive ? "text-green-50 opacity-90" : "text-neutral-500"
+                  }`}
+                >
                   {lastMessage}
                 </div>
                 {c.isClientTyping && (
-                  <div className="mt-1 text-[10px] text-green-600">
+                  <div
+                    className={`mt-1 text-xs font-medium italic ${
+                      isActive ? "text-white" : "text-[#3DAB42]"
+                    }`}
+                  >
                     Escribiendo...
                   </div>
                 )}
@@ -326,36 +334,46 @@ export default function OperatorChatPanel() {
       </aside>
 
       {/* Chat Window */}
-      <main className="flex-1 flex flex-col">
+      {/* --- MODIFIED: Softer bg-neutral-50 --- */}
+      <main className="flex-1 flex flex-col bg-neutral-50">
         {activeChat ? (
           <>
-            <header className="flex items-center justify-between p-3 bg-[#3DAB42] text-white">
+            {/* --- MODIFIED: More padding, subtle shadow --- */}
+            <header className="flex items-center justify-between p-6 bg-white border-b border-neutral-200 shadow-sm">
               <div>
-                <div className="font-semibold">
+                <div className="font-semibold text-neutral-900 text-lg">
                   Chat con {activeChat.username}
                 </div>
-                <div className="text-[11px] opacity-80">
+                <div className="text-xs text-neutral-500">
                   Cliente ID: {activeChat.clientId}
                 </div>
               </div>
-              <div className="text-[11px] opacity-90">
+              <div className="text-xs text-neutral-500">
                 Total mensajes: {activeChat.messages.length}
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
+            {/* --- MODIFIED: bg-neutral-100 to match page, more space --- */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-100">
               {activeChat.messages.map((m, i) => (
                 <div
                   key={i}
-                  className={`p-2 rounded-lg max-w-[75%] break-words shadow-sm ${
+                  /* --- MODIFIED: "Bubbly" (rounded-2xl) + asymmetric radius + "glow" --- */
+                  className={`p-4 rounded-2xl max-w-[75%] break-words text-sm ${
                     m.from === "operator"
-                      ? "bg-[#3DAB42]/90 text-white ml-auto"
-                      : "bg-white text-gray-800 mr-auto border border-gray-200"
+                      ? "bg-[#3DAB42] text-white ml-auto shadow-lg shadow-green-600/20 rounded-br-lg"
+                      : "bg-white text-neutral-800 mr-auto shadow-sm border border-neutral-200 rounded-bl-lg"
                   }`}
                 >
                   {m.text}
                   {m.timestamp && (
-                    <span className="block text-[10px] opacity-70 mt-1 text-right">
+                    <span
+                      className={`block text-[11px] mt-2 text-right ${
+                        m.from === "operator"
+                          ? "text-white/90"
+                          : "text-neutral-400"
+                      }`}
+                    >
                       {new Date(m.timestamp).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -365,9 +383,8 @@ export default function OperatorChatPanel() {
                 </div>
               ))}
 
-              {/* Indicador de escribiendo del cliente en el panel principal */}
               {activeChat.isClientTyping && (
-                <div className="mr-auto text-[11px] text-gray-500 italic">
+                <div className="mr-auto text-sm text-neutral-500 italic">
                   {activeChat.username} está escribiendo...
                 </div>
               )}
@@ -375,16 +392,20 @@ export default function OperatorChatPanel() {
               <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={sendMessage} className="flex border-t bg-white">
+            {/* --- MODIFIED: New input/button layout --- */}
+            <form
+              onSubmit={sendMessage}
+              className="flex items-center gap-4 border-t border-neutral-200 bg-white p-4"
+            >
               <input
-                className="flex-1 p-3 outline-none text-gray-800"
+                className="flex-1 p-4 outline-none text-neutral-800 bg-neutral-100 rounded-xl border border-neutral-200 transition-all focus:bg-white focus:ring-2 focus:ring-[#3DAB42]"
                 placeholder="Escribí tu mensaje..."
                 value={input}
                 onChange={handleInputChange}
               />
               <button
                 type="submit"
-                className="bg-[#3DAB42] text-white px-5 font-semibold hover:bg-[#319a38] disabled:opacity-50"
+                className="bg-[#3DAB42] text-white rounded-xl h-14 w-14 flex items-center justify-center text-2xl font-semibold transition-all hover:bg-green-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={
                   !connectionStatus || connectionStatus === "disconnected"
                 }
@@ -394,11 +415,20 @@ export default function OperatorChatPanel() {
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-            <p className="text-sm mb-2">Seleccioná un chat para empezar</p>
-            <p className="text-[11px] text-gray-400">
-              Cuando un cliente inicie un chat, aparecerá en la lista de la
-              izquierda.
+          /* --- MODIFIED: Warmer empty state --- */
+          <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 bg-neutral-50">
+            <span
+              className="text-7xl mb-4"
+              role="img"
+              aria-label="Chat bubbles"
+            >
+              💬
+            </span>
+            <p className="text-xl font-semibold mb-1 text-neutral-700">
+              Seleccioná un chat para empezar
+            </p>
+            <p className="text-base text-neutral-500">
+              Los chats de clientes nuevos aparecerán en la lista.
             </p>
           </div>
         )}
