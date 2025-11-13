@@ -10,7 +10,6 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { AuthGuard } from "@/components/auth/AuthGuard";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
   Card,
@@ -49,11 +48,7 @@ const pesoFormatter = new Intl.NumberFormat("es-AR", {
 });
 
 export default function CrmWorkspacePage() {
-  return (
-    <AuthGuard allowedRoles={["ADMIN", "AGENT"]}>
-      <CrmWorkspaceContent />
-    </AuthGuard>
-  );
+  return <CrmWorkspaceContent />;
 }
 
 type ClientRecord = Awaited<

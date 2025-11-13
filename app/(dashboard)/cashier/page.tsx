@@ -16,7 +16,6 @@ import {
   X,
 } from "lucide-react";
 
-import { AuthGuard } from "@/components/auth/AuthGuard";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
   Card,
@@ -48,11 +47,7 @@ const coinFormatter = new Intl.NumberFormat("en-US", {
 type SheetStatusFilter = "all" | "charged" | "not-charged" | "pending";
 
 export default function CashierDashboardPage() {
-  return (
-    <AuthGuard allowedRoles={["ADMIN", "CASHIER"]}>
-      <CashierDashboardContent />
-    </AuthGuard>
-  );
+  return <CashierDashboardContent />;
 }
 
 function CashierDashboardContent() {
@@ -406,171 +401,177 @@ function CashierDashboardContent() {
                     Tablero de cargos diarios
                   </CardTitle>
                   <CardDescription>
-                    Capture las visitas de hoy con solo unos pocos clics. Los montos
-                    actualizan el libro mayor al instante.
+                    Capture las visitas de hoy con solo unos pocos clics. Los
+                    montos actualizan el libro mayor al instante.
                   </CardDescription>
                 </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <label className="flex flex-col text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                  Fecha de trabajo
-                  <Input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(event) => setSelectedDate(event.target.value)}
-                    className="mt-1"
-                  />
-                </label>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {showMemberFilters ? (
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                      <Search className="size-4 text-muted-foreground" />
-                      <Input
-                        value={searchTerm}
-                        onChange={(event) => setSearchTerm(event.target.value)}
-                        placeholder="Buscar miembro o nivel"
-                        className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-                      />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <label className="flex flex-col text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                    Fecha de trabajo
+                    <Input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(event) => setSelectedDate(event.target.value)}
+                      className="mt-1"
+                    />
+                  </label>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {showMemberFilters ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                        <Search className="size-4 text-muted-foreground" />
+                        <Input
+                          value={searchTerm}
+                          onChange={(event) =>
+                            setSearchTerm(event.target.value)
+                          }
+                          placeholder="Buscar miembro o nivel"
+                          className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Filter className="size-4 text-muted-foreground" />
+                        <select
+                          className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+                          value={tierFilter}
+                          onChange={(event) =>
+                            setTierFilter(
+                              event.target.value as typeof tierFilter,
+                            )
+                          }
+                        >
+                          <option value="all">Todos los niveles</option>
+                          <option value="Premium">Premium</option>
+                          <option value="Estándar">Estándar</option>
+                          <option value="Empresarial">Empresarial</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Filter className="size-4 text-muted-foreground" />
-                      <select
-                        className="h-9 rounded-md border border-border bg-background px-3 text-sm"
-                        value={tierFilter}
-                        onChange={(event) =>
-                          setTierFilter(event.target.value as typeof tierFilter)
-                        }
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowMemberFilters(false)}
                       >
-                        <option value="all">Todos los niveles</option>
-                        <option value="Premium">Premium</option>
-                        <option value="Estándar">Estándar</option>
-                        <option value="Empresarial">Empresarial</option>
-                      </select>
+                        Ocultar filtros
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex justify-end">
+                ) : (
+                  <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Filtros del libro mayor ocultos
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Ábrelos cuando los necesites desde aquí o con el menú
+                        flotante.
+                      </p>
+                    </div>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => setShowMemberFilters(false)}
+                      onClick={() => setShowMemberFilters(true)}
                     >
-                      Ocultar filtros
+                      Mostrar filtros
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">
-                      Filtros del libro mayor ocultos
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Ábrelos cuando los necesites desde aquí o con el menú flotante.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowMemberFilters(true)}
-                  >
-                    Mostrar filtros
-                  </Button>
-                </div>
-              )}
+                )}
 
-              <div className="overflow-hidden rounded-xl border border-border/60">
-                <div className="hidden grid-cols-[2fr_1fr_1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
-                  <span>Miembro</span>
-                  <span>Nivel</span>
-                  <span>Monedas este mes</span>
-                  <span className="text-right">Registrar cargo</span>
-                </div>
-                <div className="divide-y divide-border/60">
-                  {isPending && ledger.length === 0 ? (
-                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                      Cargando datos del turno...
-                    </div>
-                  ) : filteredMembers.length === 0 ? (
-                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                      Ningún miembro coincide con los filtros. Ajuste la búsqueda
-                      o el nivel.
-                    </div>
-                  ) : (
-                    filteredMembers.map((member) => (
-                      <div
-                        key={member.id}
-                        className="grid gap-4 px-4 py-4 text-sm md:grid-cols-[2fr_1fr_1fr_1.2fr] md:items-center md:px-6"
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium text-foreground">
-                            {member.name}
-                          </span>
-                          {member.visitWindow && (
-                            <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                              {member.visitWindow}
-                            </span>
-                          )}
-                          {member.preferences && (
-                            <span className="text-xs text-muted-foreground">
-                              {member.preferences}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-muted-foreground">
-                          {member.membership}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {coinFormatter.format(member.coinsThisMonth)} monedas
-                        </span>
-                        <div className="flex flex-col gap-2 md:items-end">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              min="0"
-                              inputMode="numeric"
-                              placeholder="0"
-                              value={pendingCharges[member.id] ?? ""}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setPendingCharges((prev) => ({
-                                  ...prev,
-                                  [member.id]: value,
-                                }));
-                                if (rowFeedback[member.id]) {
-                                  setRowFeedback((prev) => ({
-                                    ...prev,
-                                    [member.id]: null,
-                                  }));
-                                }
-                              }}
-                              className="h-9 w-24 text-right"
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => handleChargeSubmit(member.id)}
-                            >
-                              Registrar
-                            </Button>
-                          </div>
-                          {rowFeedback[member.id] && (
-                            <span className="text-xs text-muted-foreground">
-                              {rowFeedback[member.id]}
-                            </span>
-                          )}
-                        </div>
+                <div className="overflow-hidden rounded-xl border border-border/60">
+                  <div className="hidden grid-cols-[2fr_1fr_1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
+                    <span>Miembro</span>
+                    <span>Nivel</span>
+                    <span>Monedas este mes</span>
+                    <span className="text-right">Registrar cargo</span>
+                  </div>
+                  <div className="divide-y divide-border/60">
+                    {isPending && ledger.length === 0 ? (
+                      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                        Cargando datos del turno...
                       </div>
-                    ))
-                  )}
+                    ) : filteredMembers.length === 0 ? (
+                      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                        Ningún miembro coincide con los filtros. Ajuste la
+                        búsqueda o el nivel.
+                      </div>
+                    ) : (
+                      filteredMembers.map((member) => (
+                        <div
+                          key={member.id}
+                          className="grid gap-4 px-4 py-4 text-sm md:grid-cols-[2fr_1fr_1fr_1.2fr] md:items-center md:px-6"
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-medium text-foreground">
+                              {member.name}
+                            </span>
+                            {member.visitWindow && (
+                              <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                                {member.visitWindow}
+                              </span>
+                            )}
+                            {member.preferences && (
+                              <span className="text-xs text-muted-foreground">
+                                {member.preferences}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-muted-foreground">
+                            {member.membership}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {coinFormatter.format(member.coinsThisMonth)}{" "}
+                            monedas
+                          </span>
+                          <div className="flex flex-col gap-2 md:items-end">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={pendingCharges[member.id] ?? ""}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  setPendingCharges((prev) => ({
+                                    ...prev,
+                                    [member.id]: value,
+                                  }));
+                                  if (rowFeedback[member.id]) {
+                                    setRowFeedback((prev) => ({
+                                      ...prev,
+                                      [member.id]: null,
+                                    }));
+                                  }
+                                }}
+                                className="h-9 w-24 text-right"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleChargeSubmit(member.id)}
+                              >
+                                Registrar
+                              </Button>
+                            </div>
+                            {rowFeedback[member.id] && (
+                              <span className="text-xs text-muted-foreground">
+                                {rowFeedback[member.id]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           </section>
 
           <section id="hoja-control">
@@ -583,202 +584,210 @@ function CashierDashboardContent() {
                   Marque quién cargó puntos en la fecha seleccionada para dejar
                   constancia al equipo administrativo.
                 </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {showDailyFilters ? (
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                      <Search className="size-4 text-muted-foreground" />
-                      <Input
-                        value={sheetSearchTerm}
-                        onChange={(event) => setSheetSearchTerm(event.target.value)}
-                        placeholder="Buscar por usuario o teléfono"
-                        className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-                      />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {showDailyFilters ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-1 items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                        <Search className="size-4 text-muted-foreground" />
+                        <Input
+                          value={sheetSearchTerm}
+                          onChange={(event) =>
+                            setSheetSearchTerm(event.target.value)
+                          }
+                          placeholder="Buscar por usuario o teléfono"
+                          className="h-8 border-none bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Filter className="size-4 text-muted-foreground" />
+                        <select
+                          className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+                          value={sheetStatusFilter}
+                          onChange={(event) =>
+                            setSheetStatusFilter(
+                              event.target.value as SheetStatusFilter,
+                            )
+                          }
+                        >
+                          <option value="all">Todos los estados</option>
+                          <option value="charged">Marcados como cargó</option>
+                          <option value="not-charged">
+                            Marcados como no cargó
+                          </option>
+                          <option value="pending">Sin registro</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Filter className="size-4 text-muted-foreground" />
-                      <select
-                        className="h-9 rounded-md border border-border bg-background px-3 text-sm"
-                        value={sheetStatusFilter}
-                        onChange={(event) =>
-                          setSheetStatusFilter(
-                            event.target.value as SheetStatusFilter,
-                          )
-                        }
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowDailyFilters(false)}
                       >
-                        <option value="all">Todos los estados</option>
-                        <option value="charged">Marcados como cargó</option>
-                        <option value="not-charged">Marcados como no cargó</option>
-                        <option value="pending">Sin registro</option>
-                      </select>
+                        Ocultar filtros
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex justify-end">
+                ) : (
+                  <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Filtros de la hoja de control ocultos
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Actívalos desde aquí o con el menú flotante para afinar
+                        la vista.
+                      </p>
+                    </div>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => setShowDailyFilters(false)}
+                      onClick={() => setShowDailyFilters(true)}
                     >
-                      Ocultar filtros
+                      Mostrar filtros
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">
-                      Filtros de la hoja de control ocultos
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Actívalos desde aquí o con el menú flotante para afinar la vista.
-                    </p>
+                )}
+
+                <div className="overflow-hidden rounded-xl border border-border/60">
+                  <div className="hidden grid-cols-[1.6fr_1.1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
+                    <span>Cliente</span>
+                    <span>Estado del día</span>
+                    <span className="text-right">Actualizar</span>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowDailyFilters(true)}
-                  >
-                    Mostrar filtros
-                  </Button>
-                </div>
-              )}
+                  <div className="divide-y divide-border/60">
+                    {isPending && dailySheet.length === 0 ? (
+                      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                        Cargando usuarios...
+                      </div>
+                    ) : filteredDailySheet.length === 0 ? (
+                      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                        Ningún usuario coincide con los filtros seleccionados.
+                      </div>
+                    ) : (
+                      filteredDailySheet.map((row) => {
+                        const statusLabel =
+                          row.hasCharged === true
+                            ? "Cobró hoy"
+                            : row.hasCharged === false
+                              ? "No cargó"
+                              : "Sin registro";
+                        const statusClasses =
+                          row.hasCharged === true
+                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                            : row.hasCharged === false
+                              ? "border-rose-500/30 bg-rose-500/10 text-rose-600"
+                              : "border-border/60 bg-muted/60 text-muted-foreground";
+                        const statusIcon =
+                          row.hasCharged === true ? (
+                            <CheckCircle2 className="size-3.5" />
+                          ) : row.hasCharged === false ? (
+                            <CircleSlash2 className="size-3.5" />
+                          ) : (
+                            <CalendarClock className="size-3.5" />
+                          );
+                        const lastUpdate = row.checkedAt
+                          ? new Date(row.checkedAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : null;
 
-              <div className="overflow-hidden rounded-xl border border-border/60">
-                <div className="hidden grid-cols-[1.6fr_1.1fr_1.2fr] bg-muted/40 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground md:grid">
-                  <span>Cliente</span>
-                  <span>Estado del día</span>
-                  <span className="text-right">Actualizar</span>
-                </div>
-                <div className="divide-y divide-border/60">
-                  {isPending && dailySheet.length === 0 ? (
-                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                      Cargando usuarios...
-                    </div>
-                  ) : filteredDailySheet.length === 0 ? (
-                    <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                      Ningún usuario coincide con los filtros seleccionados.
-                    </div>
-                  ) : (
-                    filteredDailySheet.map((row) => {
-                      const statusLabel =
-                        row.hasCharged === true
-                          ? "Cobró hoy"
-                          : row.hasCharged === false
-                            ? "No cargó"
-                            : "Sin registro";
-                      const statusClasses =
-                        row.hasCharged === true
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
-                          : row.hasCharged === false
-                            ? "border-rose-500/30 bg-rose-500/10 text-rose-600"
-                            : "border-border/60 bg-muted/60 text-muted-foreground";
-                      const statusIcon =
-                        row.hasCharged === true ? (
-                          <CheckCircle2 className="size-3.5" />
-                        ) : row.hasCharged === false ? (
-                          <CircleSlash2 className="size-3.5" />
-                        ) : (
-                          <CalendarClock className="size-3.5" />
+                        return (
+                          <div
+                            key={row.clientId}
+                            className="grid gap-4 px-4 py-4 text-sm md:grid-cols-[1.6fr_1.1fr_1.2fr] md:items-center md:px-6"
+                          >
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium text-foreground">
+                                {row.username}
+                              </span>
+                              {row.phone && (
+                                <span className="text-xs text-muted-foreground">
+                                  {row.phone}
+                                </span>
+                              )}
+                              <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                                {row.status}
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusClasses}`}
+                              >
+                                {statusIcon}
+                                {statusLabel}
+                              </span>
+                              {row.checkedAt ? (
+                                <span className="text-xs text-muted-foreground">
+                                  Actualizado {lastUpdate}
+                                  {row.checkedByName
+                                    ? ` · ${row.checkedByName}`
+                                    : ""}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  Aún sin confirmación para esta fecha.
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-2 md:items-end">
+                              {row.hasCharged === null ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDailyCheckUpdate(row.clientId, true)
+                                    }
+                                    disabled={sheetSaving[row.clientId]}
+                                  >
+                                    <CheckCircle2 className="mr-2 size-4" />
+                                    Cobró
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      handleDailyCheckUpdate(
+                                        row.clientId,
+                                        false,
+                                      )
+                                    }
+                                    disabled={sheetSaving[row.clientId]}
+                                  >
+                                    <CircleSlash2 className="mr-2 size-4" />
+                                    No cobró
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center rounded-full bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
+                                  Estado registrado para hoy
+                                </span>
+                              )}
+                              {sheetSaving[row.clientId] && (
+                                <span className="text-xs text-muted-foreground">
+                                  Guardando cambios...
+                                </span>
+                              )}
+                              {sheetFeedback[row.clientId] && (
+                                <span className="text-xs text-muted-foreground">
+                                  {sheetFeedback[row.clientId]}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         );
-                      const lastUpdate = row.checkedAt
-                        ? new Date(row.checkedAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : null;
-
-                      return (
-                        <div
-                          key={row.clientId}
-                          className="grid gap-4 px-4 py-4 text-sm md:grid-cols-[1.6fr_1.1fr_1.2fr] md:items-center md:px-6"
-                        >
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-medium text-foreground">
-                              {row.username}
-                            </span>
-                            {row.phone && (
-                              <span className="text-xs text-muted-foreground">
-                                {row.phone}
-                              </span>
-                            )}
-                            <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                              {row.status}
-                            </span>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusClasses}`}
-                            >
-                              {statusIcon}
-                              {statusLabel}
-                            </span>
-                            {row.checkedAt ? (
-                              <span className="text-xs text-muted-foreground">
-                                Actualizado {lastUpdate}
-                                {row.checkedByName
-                                  ? ` · ${row.checkedByName}`
-                                  : ""}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                Aún sin confirmación para esta fecha.
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-2 md:items-end">
-                            {row.hasCharged === null ? (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleDailyCheckUpdate(row.clientId, true)
-                                  }
-                                  disabled={sheetSaving[row.clientId]}
-                                >
-                                  <CheckCircle2 className="mr-2 size-4" />
-                                  Cobró
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    handleDailyCheckUpdate(row.clientId, false)
-                                  }
-                                  disabled={sheetSaving[row.clientId]}
-                                >
-                                  <CircleSlash2 className="mr-2 size-4" />
-                                  No cobró
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center rounded-full bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-                                Estado registrado para hoy
-                              </span>
-                            )}
-                            {sheetSaving[row.clientId] && (
-                              <span className="text-xs text-muted-foreground">
-                                Guardando cambios...
-                              </span>
-                            )}
-                            {sheetFeedback[row.clientId] && (
-                              <span className="text-xs text-muted-foreground">
-                                {sheetFeedback[row.clientId]}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
+                      })
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
+              </CardContent>
             </Card>
           </section>
         </div>
@@ -794,51 +803,51 @@ function CashierDashboardContent() {
                   Todas las monedas registradas para la fecha seleccionada
                   aparecen aquí al instante.
                 </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {chargesForSelectedDate.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-muted-foreground">
-                  Aún no se han registrado cargos en esta fecha.
-                </div>
-              ) : (
-                chargesForSelectedDate.slice(0, 6).map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-background/80 px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {entry.userName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {coinFormatter.format(entry.coins)} monedas • Registrado
-                        a las{" "}
-                        {new Date(entry.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                      {entry.note && (
-                        <p className="text-xs text-muted-foreground">
-                          {entry.note}
-                        </p>
-                      )}
-                    </div>
-                    <CheckCircle2 className="size-5 text-emerald-500" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {chargesForSelectedDate.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-muted-foreground">
+                    Aún no se han registrado cargos en esta fecha.
                   </div>
-                ))
-              )}
-            </CardContent>
-            <CardFooter className="justify-between text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Coins className="size-4" />
-                {coinFormatter.format(coinsChargedToday)} monedas hoy
-              </div>
-              <div className="flex items-center gap-2">
-                <ClipboardList className="size-4" />
-                {chargesForSelectedDate.length} registros totales
-              </div>
-            </CardFooter>
+                ) : (
+                  chargesForSelectedDate.slice(0, 6).map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-background/80 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {entry.userName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {coinFormatter.format(entry.coins)} monedas •
+                          Registrado a las{" "}
+                          {new Date(entry.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                        {entry.note && (
+                          <p className="text-xs text-muted-foreground">
+                            {entry.note}
+                          </p>
+                        )}
+                      </div>
+                      <CheckCircle2 className="size-5 text-emerald-500" />
+                    </div>
+                  ))
+                )}
+              </CardContent>
+              <CardFooter className="justify-between text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Coins className="size-4" />
+                  {coinFormatter.format(coinsChargedToday)} monedas hoy
+                </div>
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="size-4" />
+                  {chargesForSelectedDate.length} registros totales
+                </div>
+              </CardFooter>
             </Card>
           </section>
 
@@ -851,33 +860,33 @@ function CashierDashboardContent() {
                 <CardDescription>
                   Deje una guía para el próximo cajero o resuma los incidentes.
                 </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={5}
-              />
-              {notesMessage && (
-                <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                  {notesMessage}
-                </p>
-              )}
-            </CardContent>
-            <CardFooter className="flex items-center justify-end gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setNotes(
-                    "Confirmar el cajón de efectivo al cierre y sincronizar los totales con finanzas antes de las 7 PM.",
-                  );
-                  setNotesMessage(null);
-                }}
-              >
-                Restablecer nota
-              </Button>
-              <Button onClick={handleSaveNotes}>Guardar para el turno</Button>
-            </CardFooter>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  rows={5}
+                />
+                {notesMessage && (
+                  <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    {notesMessage}
+                  </p>
+                )}
+              </CardContent>
+              <CardFooter className="flex items-center justify-end gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setNotes(
+                      "Confirmar el cajón de efectivo al cierre y sincronizar los totales con finanzas antes de las 7 PM.",
+                    );
+                    setNotesMessage(null);
+                  }}
+                >
+                  Restablecer nota
+                </Button>
+                <Button onClick={handleSaveNotes}>Guardar para el turno</Button>
+              </CardFooter>
             </Card>
           </section>
         </div>
@@ -956,7 +965,11 @@ function CashierDashboardContent() {
             isQuickMenuOpen ? "Cerrar menú flotante" : "Abrir menú flotante"
           }
         >
-          {isQuickMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          {isQuickMenuOpen ? (
+            <X className="size-5" />
+          ) : (
+            <Menu className="size-5" />
+          )}
         </Button>
       </nav>
     </div>

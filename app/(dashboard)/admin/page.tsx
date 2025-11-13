@@ -13,7 +13,6 @@ import {
   Users,
 } from "lucide-react";
 
-import { AuthGuard } from "@/components/auth/AuthGuard";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
   Card,
@@ -64,11 +63,7 @@ const integerFormatter = new Intl.NumberFormat("en-US", {
 });
 
 export default function AdminDashboardPage() {
-  return (
-    <AuthGuard allowedRoles={["ADMIN"]}>
-      <AdminDashboardContent />
-    </AuthGuard>
-  );
+  return <AdminDashboardContent />;
 }
 
 function AdminDashboardContent() {

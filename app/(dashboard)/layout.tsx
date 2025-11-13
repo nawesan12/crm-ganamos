@@ -1,15 +1,10 @@
 import { ReactNode } from "react";
 
-import { AuthGuard } from "@/components/auth/AuthGuard";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <AuthGuard>
+    <>
       <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#f5f3ff] via-[#ede9fe] to-[#e5dcff]">
         <div
           aria-hidden
@@ -25,6 +20,6 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
-    </AuthGuard>
+    </>
   );
 }
