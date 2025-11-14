@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { io, Socket } from "socket.io-client";
 
 // ---------------- TYPES ----------------
@@ -61,6 +61,40 @@ interface CreateClientApiResponse {
 }
 
 // ---------------- COMPONENT ----------------
+
+const renderMessageText = (text: string): ReactNode => {
+  const urlRegex = /(https?:\/\/[^\s]+)/gi;
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const url = match[0];
+    nodes.push(
+      <a
+        key={`link-${match.index}-${url}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold underline underline-offset-2 break-all"
+      >
+        {url}
+      </a>,
+    );
+
+    lastIndex = match.index + url.length;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
+};
 
 export default function OperatorChatPanel() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -796,7 +830,7 @@ export default function OperatorChatPanel() {
                       )}
 
                       {/* Texto si hay */}
-                      {m.text && <div>{m.text}</div>}
+                      {m.text && <div>{renderMessageText(m.text)}</div>}
 
                       {m.timestamp && (
                         <span
