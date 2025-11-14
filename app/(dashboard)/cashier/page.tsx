@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
+  AlertTriangle,
   CalendarClock,
   CheckCircle2,
   CircleSlash2,
@@ -153,6 +154,25 @@ function CashierDashboardContent() {
         (member) => !member.lastCharge || member.lastCharge !== selectedDate,
       ),
     [ledger, selectedDate],
+  );
+  const dailySheetSummary = useMemo(() => {
+    return dailySheet.reduce(
+      (acc, row) => {
+        if (row.hasCharged === true) acc.charged += 1;
+        else if (row.hasCharged === false) acc.notCharged += 1;
+        else acc.pending += 1;
+        return acc;
+      },
+      { charged: 0, notCharged: 0, pending: 0 },
+    );
+  }, [dailySheet]);
+  const sheetTotal = dailySheet.length;
+  const sheetCompletion = sheetTotal
+    ? Math.round((dailySheetSummary.charged / sheetTotal) * 100)
+    : 0;
+  const followUpReminders = useMemo(
+    () => pendingVisits.slice(0, 4),
+    [pendingVisits],
   );
 
   const filteredMembers = useMemo(() => {
@@ -318,6 +338,16 @@ function CashierDashboardContent() {
     // Por ahora las notas quedan solo en el estado local
     // Si querés que se guarden en DB, después hacemos un Notes model + server action
     setNotesMessage("Notas de turno guardadas para el equipo.");
+  };
+
+  const handleFocusMemberFromReminder = (memberName: string) => {
+    setShowMemberFilters(true);
+    setSearchTerm(memberName);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("tablero-cargos")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   return (
@@ -586,6 +616,38 @@ function CashierDashboardContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                    <span>Avance de confirmaciones</span>
+                    <span>{sheetCompletion}%</span>
+                  </div>
+                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted/50">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{ width: `${sheetCompletion}%` }}
+                    />
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                    <div className="rounded-lg bg-background/60 px-3 py-2">
+                      Marcados
+                      <span className="ml-1 font-semibold text-foreground">
+                        {dailySheetSummary.charged}
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-background/60 px-3 py-2">
+                      Sin cargar
+                      <span className="ml-1 font-semibold text-foreground">
+                        {dailySheetSummary.notCharged}
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-background/60 px-3 py-2">
+                      Pendiente
+                      <span className="ml-1 font-semibold text-foreground">
+                        {dailySheetSummary.pending}
+                      </span>
+                    </div>
+                  </div>
+                </div>
                 {showDailyFilters ? (
                   <div className="space-y-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -848,6 +910,67 @@ function CashierDashboardContent() {
                   {chargesForSelectedDate.length} registros totales
                 </div>
               </CardFooter>
+            </Card>
+          </section>
+          <section aria-label="Seguimientos pendientes">
+            <Card className="border-border/70 bg-background/90">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Recordatorios de seguimiento
+                </CardTitle>
+                <CardDescription>
+                  Clientes sin registro hoy para contactar de inmediato.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {followUpReminders.length === 0 ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                    <CheckCircle2 className="size-4 text-emerald-500" />
+                    Todos los miembros registraron un cargo en la fecha actual.
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {followUpReminders.map((member) => (
+                      <li
+                        key={member.id}
+                        className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 text-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {member.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {member.membership} · {member.visitWindow ?? "Turno abierto"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Último cargo:
+                              {" "}
+                              {member.lastCharge
+                                ? new Date(member.lastCharge).toLocaleDateString()
+                                : "sin registro"}
+                            </p>
+                          </div>
+                          <AlertTriangle className="size-5 text-amber-500" />
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleFocusMemberFromReminder(member.name)}
+                          >
+                            Enfocar en el tablero
+                          </Button>
+                          <span className="text-xs text-muted-foreground">
+                            {coinFormatter.format(member.coinsThisMonth)} monedas este mes
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
             </Card>
           </section>
 

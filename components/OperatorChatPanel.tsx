@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { io, Socket } from "socket.io-client";
 
 // ---------------- TYPES ----------------
+
+const QUICK_REPLIES = [
+  "Hola 👋 ¿En qué puedo ayudarte hoy?",
+  "Ya reviso tu caso y te respondo al instante.",
+  "¿Podés enviarme una foto o detalle adicional?",
+  "Gracias por escribirnos, ¡seguimos en contacto!",
+];
 
 interface Message {
   from: "client" | "operator";
@@ -59,6 +66,10 @@ export default function OperatorChatPanel() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [chatSearch, setChatSearch] = useState("");
+  const [chatFilter, setChatFilter] = useState<"all" | "unread" | "typing">(
+    "all",
+  );
   const [connectionStatus, setConnectionStatus] = useState<
     "connected" | "connecting" | "disconnected"
   >("connecting");
@@ -72,6 +83,7 @@ export default function OperatorChatPanel() {
   const [clientCreationSuccess, setClientCreationSuccess] = useState<
     string | null
   >(null);
+  const [chatNotes, setChatNotes] = useState<Record<string, string>>({});
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -91,6 +103,48 @@ export default function OperatorChatPanel() {
     activeClientId != null
       ? (chats.find((c) => c.clientId === activeClientId) ?? null)
       : null;
+  const totalUnread = useMemo(
+    () => chats.reduce((total, chat) => total + chat.unread, 0),
+    [chats],
+  );
+  const typingChats = useMemo(
+    () => chats.filter((chat) => chat.isClientTyping).length,
+    [chats],
+  );
+  const filteredChats = useMemo(() => {
+    const normalized = chatSearch.trim().toLowerCase();
+    return chats.filter((chat) => {
+      if (chatFilter === "unread" && chat.unread === 0) {
+        return false;
+      }
+      if (chatFilter === "typing" && !chat.isClientTyping) {
+        return false;
+      }
+
+      if (!normalized) {
+        return true;
+      }
+
+      return (
+        chat.username.toLowerCase().includes(normalized) ||
+        chat.clientId.toLowerCase().includes(normalized)
+      );
+    });
+  }, [chatFilter, chatSearch, chats]);
+
+  const activeChatNotes = activeChat ? chatNotes[activeChat.clientId] ?? "" : "";
+  const lastMessage = activeChat?.messages[activeChat.messages.length - 1];
+  const lastMessageTimeLabel = lastMessage?.timestamp
+    ? new Date(lastMessage.timestamp).toLocaleString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "Sin mensajes";
+  const totalImagesInChat = activeChat
+    ? activeChat.messages.filter((message) => Boolean(message.image)).length
+    : 0;
 
   useEffect(() => {
     if (!clientCreationSuccess) return;
@@ -230,10 +284,7 @@ export default function OperatorChatPanel() {
     });
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInput(value);
-
+  const updateTypingActivity = () => {
     const socket = socketRef.current;
     if (!socket || !activeClientIdRef.current) return;
 
@@ -250,6 +301,12 @@ export default function OperatorChatPanel() {
       operatorIsTypingRef.current = false;
       notifyOperatorTyping(false);
     }, 1500);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+    updateTypingActivity();
   };
 
   // 🆕 Enviar mensaje de TEXTO
@@ -437,6 +494,108 @@ export default function OperatorChatPanel() {
         ? "bg-yellow-400"
         : "bg-red-500";
 
+  const handleNoteChange = (value: string) => {
+    if (!activeChat) return;
+    setChatNotes((prev) => ({
+      ...prev,
+      [activeChat.clientId]: value,
+    }));
+  };
+
+  const handleClearNotes = () => {
+    if (!activeChat) return;
+    setChatNotes((prev) => {
+      const updated = { ...prev };
+      delete updated[activeChat.clientId];
+      return updated;
+    });
+  };
+
+  const handleQuickReply = (reply: string) => {
+    setInput((prev) => {
+      if (!prev) return reply;
+      const hasTrailingSpace = /\s$/.test(prev);
+      return `${hasTrailingSpace ? prev : `${prev} `}${reply}`;
+    });
+    updateTypingActivity();
+  };
+
+  const sidebarStats = [
+    { label: "Activos", value: chats.length },
+    { label: "Sin leer", value: totalUnread },
+    { label: "Escribiendo", value: typingChats },
+  ];
+  const renderSidebarContent = () => {
+    if (chats.length === 0) {
+      return (
+        <p className="p-4 text-neutral-400 text-center text-sm">
+          No hay chats activos
+        </p>
+      );
+    }
+
+    if (filteredChats.length === 0) {
+      return (
+        <p className="p-4 text-neutral-400 text-center text-sm">
+          No hay coincidencias para los filtros aplicados
+        </p>
+      );
+    }
+
+    return filteredChats.map((c) => {
+      const isActive = activeClientId === c.clientId;
+      const lastMessage =
+        c.messages[c.messages.length - 1]?.text ||
+        (c.messages[c.messages.length - 1]?.image
+          ? "📷 Imagen"
+          : "Nuevo chat");
+
+      return (
+        <button
+          key={c.clientId}
+          type="button"
+          onClick={() => handleSelectChat(c.clientId)}
+          className={`w-full text-left p-4 rounded-xl cursor-pointer transition-all mb-1.5 ${
+            isActive
+              ? "bg-[#3DAB42] text-white shadow-lg shadow-green-500/20"
+              : "border-transparent text-neutral-700 hover:bg-neutral-100"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`font-semibold truncate ${
+                isActive ? "text-white" : "text-neutral-900"
+              }`}
+            >
+              {c.username}
+            </span>
+            {c.unread > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                {c.unread}
+              </span>
+            )}
+          </div>
+          <div
+            className={`text-sm truncate ${
+              isActive ? "text-green-50 opacity-90" : "text-neutral-500"
+            }`}
+          >
+            {lastMessage}
+          </div>
+          {c.isClientTyping && (
+            <div
+              className={`mt-1 text-xs font-medium italic ${
+                isActive ? "text-white" : "text-[#3DAB42]"
+              }`}
+            >
+              Escribiendo...
+            </div>
+          )}
+        </button>
+      );
+    });
+  };
+
   // ---------------- RENDER ----------------
 
   return (
@@ -454,66 +613,58 @@ export default function OperatorChatPanel() {
           </div>
         </div>
 
-        {chats.length === 0 && (
-          <p className="p-4 text-neutral-400 text-center text-sm">
-            No hay chats activos
-          </p>
-        )}
-
-        <div className="flex-1 overflow-y-auto p-3">
-          {chats.map((c) => {
-            const isActive = activeClientId === c.clientId;
-            const lastMessage =
-              c.messages[c.messages.length - 1]?.text ||
-              (c.messages[c.messages.length - 1]?.image
-                ? "📷 Imagen"
-                : "Nuevo chat");
-
-            return (
+        <div className="border-b border-neutral-100 px-4 py-4 space-y-3">
+          <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
+            <span role="img" aria-hidden className="text-neutral-400">
+              🔎
+            </span>
+            <input
+              value={chatSearch}
+              onChange={(event) => setChatSearch(event.target.value)}
+              className="w-full bg-transparent text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none"
+              placeholder="Buscar por nombre o ID"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {[
+              { label: "Todos", value: "all" },
+              { label: "Sin responder", value: "unread" },
+              { label: "Escribiendo", value: "typing" },
+            ].map((option) => (
               <button
-                key={c.clientId}
+                key={option.value}
                 type="button"
-                onClick={() => handleSelectChat(c.clientId)}
-                className={`w-full text-left p-4 rounded-xl cursor-pointer transition-all mb-1.5 ${
-                  isActive
-                    ? "bg-[#3DAB42] text-white shadow-lg shadow-green-500/20"
-                    : "border-transparent text-neutral-700 hover:bg-neutral-100"
+                onClick={() =>
+                  setChatFilter(option.value as typeof chatFilter)
+                }
+                className={`flex-1 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                  chatFilter === option.value
+                    ? "border-[#3DAB42] bg-[#3DAB42]/10 text-[#3DAB42]"
+                    : "border-neutral-200 text-neutral-500 hover:bg-neutral-100"
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`font-semibold truncate ${
-                      isActive ? "text-white" : "text-neutral-900"
-                    }`}
-                  >
-                    {c.username}
-                  </span>
-                  {c.unread > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      {c.unread}
-                    </span>
-                  )}
-                </div>
-                <div
-                  className={`text-sm truncate ${
-                    isActive ? "text-green-50 opacity-90" : "text-neutral-500"
-                  }`}
-                >
-                  {lastMessage}
-                </div>
-                {c.isClientTyping && (
-                  <div
-                    className={`mt-1 text-xs font-medium italic ${
-                      isActive ? "text-white" : "text-[#3DAB42]"
-                    }`}
-                  >
-                    Escribiendo...
-                  </div>
-                )}
+                {option.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            {sidebarStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl border border-dashed border-neutral-200 px-2 py-2"
+              >
+                <p className="text-[11px] uppercase tracking-wide text-neutral-400">
+                  {stat.label}
+                </p>
+                <p className="text-base font-semibold text-neutral-800">
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
+
+        <div className="flex-1 overflow-y-auto p-3">{renderSidebarContent()}</div>
       </aside>
 
       {/* Chat Window */}
@@ -542,6 +693,57 @@ export default function OperatorChatPanel() {
                 </button>
               </div>
             </header>
+
+            <section className="border-b border-neutral-200 bg-white/70 px-6 py-4">
+              <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-neutral-100 bg-white px-4 py-3 shadow-sm">
+                    <p className="text-xs uppercase tracking-wide text-neutral-400">
+                      Último mensaje
+                    </p>
+                    <p className="text-sm font-semibold text-neutral-900">
+                      {lastMessageTimeLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-neutral-100 bg-white px-4 py-3 shadow-sm">
+                    <p className="text-xs uppercase tracking-wide text-neutral-400">
+                      De cliente
+                    </p>
+                    <p className="text-sm font-semibold text-neutral-900">
+                      {activeChat.messages.filter((m) => m.from === "client").length}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-neutral-100 bg-white px-4 py-3 shadow-sm">
+                    <p className="text-xs uppercase tracking-wide text-neutral-400">
+                      Adjuntos
+                    </p>
+                    <p className="text-sm font-semibold text-neutral-900">
+                      {totalImagesInChat}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-neutral-500">
+                    <span>Notas rápidas</span>
+                    {activeChatNotes && (
+                      <button
+                        type="button"
+                        onClick={handleClearNotes}
+                        className="text-[#3DAB42] transition hover:text-green-700"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    value={activeChatNotes}
+                    onChange={(event) => handleNoteChange(event.target.value)}
+                    placeholder="Anotá contexto o recordatorios para este chat"
+                    className="h-24 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700 transition focus:border-[#3DAB42] focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+            </section>
 
             {(clientCreationError || clientCreationSuccess) && (
               <div
@@ -620,6 +822,25 @@ export default function OperatorChatPanel() {
               )}
 
               <div ref={messagesEndRef} />
+            </div>
+
+            <div className="border-t border-neutral-200 bg-white/70 px-4 py-3">
+              <div className="flex items-center justify-between text-xs text-neutral-500">
+                <span>Respuestas rápidas</span>
+                <span>{QUICK_REPLIES.length} sugerencias</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {QUICK_REPLIES.map((reply) => (
+                  <button
+                    key={reply}
+                    type="button"
+                    onClick={() => handleQuickReply(reply)}
+                    className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-600 transition hover:border-[#3DAB42] hover:text-[#3DAB42]"
+                  >
+                    {reply}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Input + botones */}
