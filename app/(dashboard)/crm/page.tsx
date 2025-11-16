@@ -6,6 +6,8 @@ import {
   Coins,
   MessageSquare,
   Plus,
+  PencilLine,
+  Trash2,
   Users,
   Wallet,
 } from "lucide-react";
@@ -32,13 +34,16 @@ import {
 import {
   ContactChannel,
   ContactDirection,
+  ClientStatus,
   PaymentMethod,
 } from "@prisma/client";
 import { listClientsAction } from "@/actions";
 import {
   createClientAction,
+  deleteClientAction,
   logContactAction,
   registerPointChargeAction,
+  updateClientAction,
 } from "@/actions/crm";
 
 const pesoFormatter = new Intl.NumberFormat("es-AR", {
@@ -75,6 +80,13 @@ type ChargeFormState = {
   description: string;
 };
 
+type EditClientForm = {
+  id: number;
+  username: string;
+  phone: string;
+  status: ClientStatus;
+};
+
 function CrmWorkspaceContent() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -99,8 +111,10 @@ function CrmWorkspaceContent() {
   const [error, setError] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [isChargeDialogOpen, setIsChargeDialogOpen] = useState(false);
+  const [editClient, setEditClient] = useState<EditClientForm | null>(null);
 
   useEffect(() => {
     startTransition(() => {
@@ -267,6 +281,85 @@ function CrmWorkspaceContent() {
     setIsChargeDialogOpen(true);
   };
 
+  const handleOpenEditClientDialog = (client: ClientRecord) => {
+    setError(null);
+    setFeedback(null);
+    setEditClient({
+      id: client.id,
+      username: client.username,
+      phone: client.phone ?? "",
+      status: client.status,
+    });
+    setIsEditClientDialogOpen(true);
+  };
+
+  const handleUpdateClient = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setFeedback(null);
+
+    if (!editClient) return;
+
+    if (!editClient.username.trim()) {
+      setError("Ingresá un identificador de cliente.");
+      return;
+    }
+
+    startTransition(() => {
+      updateClientAction({
+        id: editClient.id,
+        username: editClient.username.trim(),
+        phone: editClient.phone.trim() || undefined,
+        status: editClient.status,
+      })
+        .then((client) => {
+          setClients((prev) =>
+            prev.map((item) => (item.id === client.id ? client : item)),
+          );
+          setFeedback(`Cliente ${client.username} actualizado correctamente.`);
+          setIsEditClientDialogOpen(false);
+          setEditClient(null);
+        })
+        .catch((err) => {
+          console.error("Error updating client", err);
+          setError("No se pudo actualizar el cliente.");
+        });
+    });
+  };
+
+  const handleDeleteClient = (client: ClientRecord) => {
+    const confirmed = window.confirm(
+      `¿Eliminar al cliente ${client.username}? Esta acción no se puede deshacer.`,
+    );
+
+    if (!confirmed) return;
+
+    setError(null);
+    setFeedback(null);
+
+    startTransition(() => {
+      deleteClientAction({ id: client.id })
+        .then(() => {
+          setClients((prev) => prev.filter((item) => item.id !== client.id));
+          setContactForm((prev) =>
+            prev.clientId === `${client.id}`
+              ? { ...prev, clientId: "" }
+              : prev,
+          );
+          setChargeForm((prev) =>
+            prev.clientId === `${client.id}`
+              ? { ...prev, clientId: "", amount: "" }
+              : prev,
+          );
+          setFeedback(`Cliente ${client.username} eliminado correctamente.`);
+        })
+        .catch((err) => {
+          console.error("Error deleting client", err);
+          setError("No se pudo eliminar el cliente.");
+        });
+    });
+  };
+
   return (
     <div className="space-y-10">
       <div className="flex flex-col gap-3">
@@ -355,13 +448,35 @@ function CrmWorkspaceContent() {
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex flex-col items-end text-sm">
-                    <span className="font-semibold text-foreground">
-                      {pesoFormatter.format(client.pointsBalance)}
-                    </span>
-                    <span className="text-muted-foreground">
-                      Saldo disponible
-                    </span>
+                  <div className="flex flex-col items-end gap-2 text-sm sm:flex-row sm:items-center sm:gap-3">
+                    <div className="text-right">
+                      <span className="block font-semibold text-foreground">
+                        {pesoFormatter.format(client.pointsBalance)}
+                      </span>
+                      <span className="text-muted-foreground">
+                        Saldo disponible
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEditClientDialog(client)}
+                        className="gap-2"
+                      >
+                        <PencilLine className="size-4" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteClient(client)}
+                        className="text-destructive hover:text-destructive"
+                        aria-label={`Eliminar ${client.username}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -650,6 +765,111 @@ function CrmWorkspaceContent() {
               Guardar contacto
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isEditClientDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditClientDialogOpen(open);
+          if (!open) {
+            setEditClient(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar cliente</DialogTitle>
+            <DialogDescription>
+              Actualizá el identificador, teléfono o estado del cliente.
+            </DialogDescription>
+          </DialogHeader>
+          {editClient ? (
+            <form className="space-y-4" onSubmit={handleUpdateClient}>
+              <div className="space-y-2">
+                <label
+                  htmlFor="edit-client-username"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Usuario / alias
+                </label>
+                <Input
+                  id="edit-client-username"
+                  value={editClient.username}
+                  onChange={(event) =>
+                    setEditClient((prev) =>
+                      prev
+                        ? { ...prev, username: event.target.value }
+                        : prev,
+                    )
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  htmlFor="edit-client-phone"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Teléfono
+                </label>
+                <Input
+                  id="edit-client-phone"
+                  value={editClient.phone}
+                  onChange={(event) =>
+                    setEditClient((prev) =>
+                      prev
+                        ? { ...prev, phone: event.target.value }
+                        : prev,
+                    )
+                  }
+                  placeholder="5491130000000"
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  htmlFor="edit-client-status"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Estado
+                </label>
+                <select
+                  id="edit-client-status"
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  value={editClient.status}
+                  onChange={(event) =>
+                    setEditClient((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            status: event.target.value as ClientStatus,
+                          }
+                        : prev,
+                    )
+                  }
+                >
+                  {Object.values(ClientStatus).map((status) => (
+                    <option key={status} value={status}>
+                      {status.toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3">
+                <Button type="submit" disabled={isPending} className="flex-1">
+                  Guardar cambios
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setIsEditClientDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          ) : null}
         </DialogContent>
       </Dialog>
 
