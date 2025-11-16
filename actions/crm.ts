@@ -72,6 +72,25 @@ export async function updateClientAction(input: UpdateClientInput) {
   return client;
 }
 
+const deleteClientSchema = z.object({
+  id: z.number().int(),
+});
+
+export type DeleteClientInput = z.infer<typeof deleteClientSchema>;
+
+export async function deleteClientAction(input: DeleteClientInput) {
+  const data = deleteClientSchema.parse(input);
+
+  await prisma.$transaction([
+    prisma.pointTransaction.deleteMany({ where: { clientId: data.id } }),
+    prisma.clientContact.deleteMany({ where: { clientId: data.id } }),
+    prisma.dailyChargeCheck.deleteMany({ where: { clientId: data.id } }),
+    prisma.client.delete({ where: { id: data.id } }),
+  ]);
+
+  return { id: data.id };
+}
+
 /* ----------------------------------------
  * 2) LOG CONTACT (ads, WhatsApp, etc.)
  * -------------------------------------- */

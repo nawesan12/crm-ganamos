@@ -175,3 +175,26 @@ export async function listMarketingSourcesAction() {
     orderBy: { name: "asc" },
   });
 }
+
+const deleteMarketingSourceSchema = z.object({
+  id: z.number().int(),
+});
+
+export type DeleteMarketingSourceInput = z.infer<
+  typeof deleteMarketingSourceSchema
+>;
+
+export async function deleteMarketingSourceAction(
+  input: DeleteMarketingSourceInput,
+) {
+  const data = deleteMarketingSourceSchema.parse(input);
+  const [, deleted] = await prisma.$transaction([
+    prisma.client.updateMany({
+      where: { marketingSourceId: data.id },
+      data: { marketingSourceId: null },
+    }),
+    prisma.marketingSource.delete({ where: { id: data.id } }),
+  ]);
+
+  return deleted;
+}
