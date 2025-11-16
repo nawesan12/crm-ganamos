@@ -7,6 +7,8 @@ import {
   MessageSquare,
   Plus,
   PencilLine,
+  Search,
+  ListFilter,
   Trash2,
   Users,
   Wallet,
@@ -90,6 +92,7 @@ type EditClientForm = {
 function CrmWorkspaceContent() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [totalClients, setTotalClients] = useState<number | null>(null);
   const [newClient, setNewClient] = useState<NewClientForm>({
     username: "",
     phone: "",
@@ -109,6 +112,13 @@ function CrmWorkspaceContent() {
   });
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | ClientStatus
+  >("all");
+  const [sortMode, setSortMode] = useState<
+    "recent" | "balance-desc" | "alphabetical"
+  >("recent");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
@@ -117,20 +127,34 @@ function CrmWorkspaceContent() {
   const [editClient, setEditClient] = useState<EditClientForm | null>(null);
 
   useEffect(() => {
-    startTransition(() => {
-      listClientsAction({ page: 1, pageSize: 50 })
-        .then((data) => {
-          setClients(data.clients);
+    const timeoutId = window.setTimeout(() => {
+      setError(null);
+      setFeedback(null);
+      startTransition(() => {
+        listClientsAction({
+          page: 1,
+          pageSize: 50,
+          query: searchTerm.trim() || undefined,
+          status: statusFilter === "all" ? undefined : statusFilter,
         })
-        .catch((err) => {
-          console.error("Error loading clients", err);
-          setError("No pudimos cargar los clientes.");
-        });
-    });
-  }, []);
+          .then((data) => {
+            setClients(data.clients);
+            setTotalClients(data.total);
+          })
+          .catch((err) => {
+            console.error("Error loading clients", err);
+            setError("No pudimos cargar los clientes.");
+          });
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchTerm, statusFilter]);
 
   const metrics = useMemo(() => {
-    const total = clients.length;
+    const total = totalClients ?? clients.length;
     const active = clients.filter(
       (client) => client.status === "ACTIVE",
     ).length;
@@ -144,7 +168,33 @@ function CrmWorkspaceContent() {
       active,
       balance,
     };
+  }, [clients, totalClients]);
+
+  const statusDistribution = useMemo(() => {
+    return clients.reduce<Record<ClientStatus, number>>(
+      (acc, client) => {
+        acc[client.status] = (acc[client.status] ?? 0) + 1;
+        return acc;
+      },
+      { ACTIVE: 0, INACTIVE: 0, BANNED: 0 },
+    );
   }, [clients]);
+
+  const orderedClients = useMemo(() => {
+    const sorted = [...clients];
+
+    switch (sortMode) {
+      case "balance-desc":
+        return sorted.sort((a, b) => b.pointsBalance - a.pointsBalance);
+      case "alphabetical":
+        return sorted.sort((a, b) => a.username.localeCompare(b.username));
+      default:
+        return sorted.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+    }
+  }, [clients, sortMode]);
 
   const handleCreateClient = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -263,6 +313,7 @@ function CrmWorkspaceContent() {
   };
 
   const isLoading = isPending && clients.length === 0;
+  const isRefreshing = isPending && clients.length > 0;
 
   const closeMenu = () => setIsMenuOpen(false);
 
@@ -412,12 +463,110 @@ function CrmWorkspaceContent() {
       <div className="grid gap-6">
         <Card className="border-border/70 bg-background/90">
           <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Clientes recientes
-            </CardTitle>
-            <CardDescription>
-              Visibilidad rápida de los registros más activos en el sistema.
-            </CardDescription>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-xl font-semibold text-foreground">
+                  Explorador de clientes
+                </CardTitle>
+                <CardDescription>
+                  Filtrá por estado, buscá por nombre o teléfono y organizá la
+                  lista según lo que necesites.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border/60 bg-background/80 px-3 py-1 font-medium text-foreground">
+                  Total registrado: {totalClients ?? clients.length}
+                </span>
+                <span className="rounded-full border border-border/60 bg-background/80 px-3 py-1">
+                  Activos: {statusDistribution.ACTIVE}
+                </span>
+                <span className="rounded-full border border-border/60 bg-background/80 px-3 py-1">
+                  Inactivos: {statusDistribution.INACTIVE}
+                </span>
+                <span className="rounded-full border border-border/60 bg-background/80 px-3 py-1">
+                  Bloqueados: {statusDistribution.BANNED}
+                </span>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Búsqueda rápida
+                </span>
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Nombre, alias o teléfono"
+                    className="pl-9"
+                  />
+                </label>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Estado
+                </span>
+                <div className="relative">
+                  <ListFilter className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <select
+                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 pl-9 text-sm"
+                    value={statusFilter}
+                    onChange={(event) =>
+                      setStatusFilter(event.target.value as ClientStatus | "all")
+                    }
+                  >
+                    <option value="all">Todos los estados</option>
+                    {Object.values(ClientStatus).map((status) => (
+                      <option key={status} value={status}>
+                        {status.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Ordenar por
+                </span>
+                <div className="flex gap-2">
+                  <select
+                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                    value={sortMode}
+                    onChange={(event) =>
+                      setSortMode(
+                        event.target.value as
+                          | "recent"
+                          | "balance-desc"
+                          | "alphabetical",
+                      )
+                    }
+                  >
+                    <option value="recent">Más recientes</option>
+                    <option value="balance-desc">Mayor saldo</option>
+                    <option value="alphabetical">Orden alfabético</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="whitespace-nowrap"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setStatusFilter("all");
+                      setSortMode("recent");
+                    }}
+                    disabled={isPending}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+              </div>
+            </div>
+            {isRefreshing ? (
+              <p className="text-xs text-muted-foreground">
+                Actualizando resultados...
+              </p>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
@@ -429,8 +578,12 @@ function CrmWorkspaceContent() {
                 Aún no se registraron clientes. Creá el primero con el
                 formulario lateral.
               </div>
+            ) : orderedClients.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-muted-foreground">
+                No encontramos resultados con los filtros actuales.
+              </div>
             ) : (
-              clients.slice(0, 8).map((client) => (
+              orderedClients.map((client) => (
                 <div
                   key={client.id}
                   className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/80 p-4 sm:flex-row sm:items-center sm:justify-between"
