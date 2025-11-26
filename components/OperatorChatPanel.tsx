@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { io, Socket } from "socket.io-client";
+import Link from "next/link";
+import { ArrowLeft, Search, X, Loader2, AlertCircle } from "lucide-react";
+import {
+  saveChatMessageAction,
+  getChatHistoryAction,
+  getClientByUsernameAction,
+  markMessagesAsReadAction,
+} from "@/actions/chat";
+import { MessageSenderType, MessageType } from "@prisma/client";
+import { useAuthStore } from "@/stores/auth-store";
 
 // ---------------- TYPES ----------------
 
@@ -12,6 +22,8 @@ interface Message {
   mimeType?: string; // 🆕 opcional
   name?: string; // 🆕 nombre de archivo
   timestamp?: string;
+  id?: number; // Database ID
+  isRead?: boolean;
 }
 
 interface Chat {
@@ -20,6 +32,8 @@ interface Chat {
   messages: Message[];
   unread: number;
   isClientTyping?: boolean;
+  clientDbId?: number; // Database client ID
+  isLoadingHistory?: boolean;
 }
 
 interface NewChatPayload {
@@ -48,9 +62,14 @@ export default function OperatorChatPanel() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<
     "connected" | "connecting" | "disconnected"
   >("connecting");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const user = useAuthStore((state) => state.user);
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -77,6 +96,77 @@ export default function OperatorChatPanel() {
     }
   }, [activeChat?.messages.length]);
 
+  // ---------------- DATABASE HELPER FUNCTIONS ----------------
+
+  const loadChatHistory = async (clientUsername: string, clientDbId: number) => {
+    try {
+      const history = await getChatHistoryAction({ clientId: clientDbId, limit: 100 });
+
+      const convertedMessages: Message[] = history.map((msg: any) => ({
+        from: msg.senderType === MessageSenderType.CLIENT ? "client" : "operator",
+        text: msg.text ?? undefined,
+        image: msg.imageUrl ?? undefined,
+        mimeType: msg.mimeType ?? undefined,
+        name: msg.imageName ?? undefined,
+        timestamp: msg.createdAt.toISOString(),
+        id: msg.id,
+        isRead: msg.isRead,
+      }));
+
+      setChats((prev) =>
+        prev.map((c) =>
+          c.username === clientUsername
+            ? { ...c, messages: convertedMessages, isLoadingHistory: false }
+            : c
+        )
+      );
+    } catch (err) {
+      console.error("Error loading chat history:", err);
+      setError("No se pudo cargar el historial del chat");
+      setChats((prev) =>
+        prev.map((c) =>
+          c.username === clientUsername
+            ? { ...c, isLoadingHistory: false }
+            : c
+        )
+      );
+    }
+  };
+
+  const saveMessageToDb = async (
+    clientUsername: string,
+    message: Message,
+    clientDbId?: number
+  ) => {
+    try {
+      // Get client DB ID if not provided
+      let dbClientId = clientDbId;
+      if (!dbClientId) {
+        const client = await getClientByUsernameAction({ username: clientUsername });
+        if (!client) {
+          console.warn("Client not found in database:", clientUsername);
+          return;
+        }
+        dbClientId = client.id;
+      }
+
+      await saveChatMessageAction({
+        clientId: dbClientId,
+        clientSocketId: message.from === "client" ? activeClientId ?? null : null,
+        senderType: message.from === "client" ? MessageSenderType.CLIENT : MessageSenderType.OPERATOR,
+        operatorId: message.from === "operator" ? user?.id ?? null : null,
+        messageType: message.image ? MessageType.IMAGE : MessageType.TEXT,
+        text: message.text ?? null,
+        imageUrl: message.image ?? null,
+        imageName: message.name ?? null,
+        mimeType: message.mimeType ?? null,
+        sessionId: null,
+      });
+    } catch (err) {
+      console.error("Error saving message to database:", err);
+    }
+  };
+
   useEffect(() => {
     const s = io("https://chat-backend-cbla.onrender.com", {
       path: "/chat",
@@ -102,14 +192,14 @@ export default function OperatorChatPanel() {
       setConnectionStatus("disconnected");
     });
 
-    s.on("newChat", (data: NewChatPayload) => {
+    s.on("newChat", async (data: NewChatPayload) => {
       setChats((prev) => {
         const exists = prev.some((c) => c.clientId === data.clientId);
         if (exists) return prev;
 
         const updated = [
           ...prev,
-          { ...data, messages: [], unread: 0, isClientTyping: false },
+          { ...data, messages: [], unread: 0, isClientTyping: false, isLoadingHistory: true },
         ];
 
         if (!activeClientIdRef.current && updated.length > 0) {
@@ -118,31 +208,57 @@ export default function OperatorChatPanel() {
 
         return updated;
       });
+
+      // Load chat history from database
+      try {
+        const client = await getClientByUsernameAction({ username: data.username });
+        if (client) {
+          setChats((prev) =>
+            prev.map((c) =>
+              c.clientId === data.clientId ? { ...c, clientDbId: client.id } : c
+            )
+          );
+          await loadChatHistory(data.username, client.id);
+        } else {
+          setChats((prev) =>
+            prev.map((c) =>
+              c.clientId === data.clientId ? { ...c, isLoadingHistory: false } : c
+            )
+          );
+        }
+      } catch (err) {
+        console.error("Error loading client data:", err);
+        setChats((prev) =>
+          prev.map((c) =>
+            c.clientId === data.clientId ? { ...c, isLoadingHistory: false } : c
+          )
+        );
+      }
     });
 
     // 🆕 Soporte texto + imagen del cliente
-    s.on("incomingMessage", (data: IncomingMessagePayload) => {
+    s.on("incomingMessage", async (data: IncomingMessagePayload) => {
+      const base = {
+        from: "client" as const,
+        timestamp: new Date().toISOString(),
+      };
+
+      const newMsg: Message =
+        data.type === "image" && data.image
+          ? {
+              ...base,
+              image: data.image,
+              mimeType: data.mimeType,
+              name: data.name,
+            }
+          : {
+              ...base,
+              text: data.message ?? "",
+            };
+
       setChats((prev) =>
         prev.map((c) => {
           if (c.clientId !== data.from) return c;
-
-          const base = {
-            from: "client" as const,
-            timestamp: new Date().toISOString(),
-          };
-
-          const newMsg: Message =
-            data.type === "image" && data.image
-              ? {
-                  ...base,
-                  image: data.image,
-                  mimeType: data.mimeType,
-                  name: data.name,
-                }
-              : {
-                  ...base,
-                  text: data.message ?? "",
-                };
 
           return {
             ...c,
@@ -153,6 +269,12 @@ export default function OperatorChatPanel() {
           };
         }),
       );
+
+      // Save to database
+      const chat = chats.find((c) => c.clientId === data.from);
+      if (chat) {
+        await saveMessageToDb(chat.username, newMsg, chat.clientDbId);
+      }
     });
 
     s.on("clientTyping", (data: TypingPayload) => {
@@ -222,9 +344,15 @@ export default function OperatorChatPanel() {
   };
 
   // 🆕 Enviar mensaje de TEXTO
-  const sendMessage = (e: React.FormEvent) => {
+  const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !activeChat || !socketRef.current) return;
+
+    const newMsg: Message = {
+      from: "operator",
+      text: input,
+      timestamp: new Date().toISOString(),
+    };
 
     socketRef.current.emit("operatorMessage", {
       to: activeChat.clientId,
@@ -237,18 +365,14 @@ export default function OperatorChatPanel() {
         c.clientId === activeChat.clientId
           ? {
               ...c,
-              messages: [
-                ...c.messages,
-                {
-                  from: "operator",
-                  text: input,
-                  timestamp: new Date().toISOString(),
-                },
-              ],
+              messages: [...c.messages, newMsg],
             }
           : c,
       ),
     );
+
+    // Save to database
+    await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
 
     if (operatorTypingTimeoutRef.current) {
       clearTimeout(operatorTypingTimeoutRef.current);
@@ -279,8 +403,16 @@ export default function OperatorChatPanel() {
     if (!socketRef.current || !activeChat) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const base64 = reader.result as string;
+
+      const newMsg: Message = {
+        from: "operator",
+        image: base64,
+        mimeType: file.type,
+        name: file.name,
+        timestamp: new Date().toISOString(),
+      };
 
       // Emitir al servidor
       socketRef.current?.emit("operatorMessage", {
@@ -298,20 +430,14 @@ export default function OperatorChatPanel() {
           c.clientId === activeChat.clientId
             ? {
                 ...c,
-                messages: [
-                  ...c.messages,
-                  {
-                    from: "operator",
-                    image: base64,
-                    mimeType: file.type,
-                    name: file.name,
-                    timestamp: new Date().toISOString(),
-                  },
-                ],
+                messages: [...c.messages, newMsg],
               }
             : c,
         ),
       );
+
+      // Save to database
+      await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
 
       e.target.value = "";
     };
@@ -339,13 +465,43 @@ export default function OperatorChatPanel() {
     <div className="flex h-screen bg-neutral-100 text-base text-neutral-800">
       {/* Sidebar */}
       <aside className="w-80 bg-white border-r border-neutral-200 flex flex-col overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-neutral-200">
-          <h2 className="font-semibold text-xl text-neutral-900">
-            Chats activos
-          </h2>
-          <div className="flex items-center gap-1.5 text-xs text-neutral-600">
-            <span className={`h-2 w-2 rounded-full ${statusDotClass}`} />
-            <span>{statusLabel}</span>
+        <div className="flex flex-col border-b border-neutral-200">
+          <div className="flex items-center justify-between p-6 pb-3">
+            <h2 className="font-semibold text-xl text-neutral-900">
+              Chats activos
+            </h2>
+            <div className="flex items-center gap-1.5 text-xs text-neutral-600">
+              <span className={`h-2 w-2 rounded-full ${statusDotClass} animate-pulse`} />
+              <span>{statusLabel}</span>
+            </div>
+          </div>
+          <div className="px-6 pb-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+              <input
+                type="text"
+                placeholder="Buscar chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="px-6 pb-3 pt-2">
+            <Link href="/crm">
+              <button className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-all">
+                <ArrowLeft className="h-4 w-4" />
+                Volver al CRM
+              </button>
+            </Link>
           </div>
         </div>
 
@@ -356,22 +512,30 @@ export default function OperatorChatPanel() {
         )}
 
         <div className="flex-1 overflow-y-auto p-3">
-          {chats.map((c) => {
-            const isActive = activeClientId === c.clientId;
-            const lastMessage =
-              c.messages[c.messages.length - 1]?.text ||
-              (c.messages[c.messages.length - 1]?.image
-                ? "📷 Imagen"
-                : "Nuevo chat");
+          {chats
+            .filter((c) =>
+              searchQuery
+                ? c.username.toLowerCase().includes(searchQuery.toLowerCase())
+                : true
+            )
+            .map((c) => {
+              const isActive = activeClientId === c.clientId;
+              const lastMessage =
+                c.messages[c.messages.length - 1]?.text ||
+                (c.messages[c.messages.length - 1]?.image
+                  ? "📷 Imagen"
+                  : c.isLoadingHistory
+                    ? "Cargando historial..."
+                    : "Nuevo chat");
 
-            return (
+              return (
               <button
                 key={c.clientId}
                 type="button"
                 onClick={() => handleSelectChat(c.clientId)}
                 className={`w-full text-left p-4 rounded-xl cursor-pointer transition-all mb-1.5 ${
                   isActive
-                    ? "bg-[#3DAB42] text-white shadow-lg shadow-green-500/20"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                     : "border-transparent text-neutral-700 hover:bg-neutral-100"
                 }`}
               >
@@ -384,14 +548,17 @@ export default function OperatorChatPanel() {
                     {c.username}
                   </span>
                   {c.unread > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white animate-pulse">
                       {c.unread}
                     </span>
+                  )}
+                  {c.isLoadingHistory && (
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin text-neutral-400" />
                   )}
                 </div>
                 <div
                   className={`text-sm truncate ${
-                    isActive ? "text-green-50 opacity-90" : "text-neutral-500"
+                    isActive ? "text-primary-foreground/90" : "text-neutral-500"
                   }`}
                 >
                   {lastMessage}
@@ -399,7 +566,7 @@ export default function OperatorChatPanel() {
                 {c.isClientTyping && (
                   <div
                     className={`mt-1 text-xs font-medium italic ${
-                      isActive ? "text-white" : "text-[#3DAB42]"
+                      isActive ? "text-primary-foreground" : "text-primary"
                     }`}
                   >
                     Escribiendo...
@@ -417,19 +584,55 @@ export default function OperatorChatPanel() {
           <>
             <header className="flex items-center justify-between p-6 bg-white border-b border-neutral-200 shadow-sm">
               <div>
-                <div className="font-semibold text-neutral-900 text-lg">
+                <div className="font-semibold text-neutral-900 text-lg flex items-center gap-2">
                   Chat con {activeChat.username}
+                  {activeChat.isLoadingHistory && (
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  )}
                 </div>
-                <div className="text-xs text-neutral-500">
+                <div className="text-xs text-neutral-500 flex items-center gap-2">
                   Cliente ID: {activeChat.clientId}
+                  {activeChat.clientDbId && (
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-medium">
+                      DB: #{activeChat.clientDbId}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="text-xs text-neutral-500">
-                Total mensajes: {activeChat.messages.length}
+              <div className="text-xs text-neutral-500 text-right">
+                <div>Total mensajes: {activeChat.messages.length}</div>
+                {activeChat.unread > 0 && (
+                  <div className="mt-1 text-red-500 font-medium">
+                    {activeChat.unread} sin leer
+                  </div>
+                )}
               </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-100">
+              {error && (
+                <div className="mx-auto max-w-md bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="font-medium text-red-900 text-sm">Error</div>
+                    <div className="text-red-700 text-sm mt-1">{error}</div>
+                  </div>
+                  <button
+                    onClick={() => setError(null)}
+                    className="text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {activeChat.isLoadingHistory && activeChat.messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                  <p className="text-sm">Cargando historial del chat...</p>
+                </div>
+              )}
+
               {activeChat.messages.map((m, i) => {
                 const isOperator = m.from === "operator";
 
@@ -443,7 +646,7 @@ export default function OperatorChatPanel() {
                     <div
                       className={`p-4 rounded-2xl break-words text-sm ${
                         isOperator
-                          ? "bg-[#3DAB42] text-white shadow-lg shadow-green-600/20 rounded-br-lg"
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 rounded-br-lg"
                           : "bg-white text-neutral-800 shadow-sm border border-neutral-200 rounded-bl-lg"
                       }`}
                     >
@@ -472,7 +675,7 @@ export default function OperatorChatPanel() {
                       {m.timestamp && (
                         <span
                           className={`block text-[11px] mt-2 text-right ${
-                            isOperator ? "text-white/90" : "text-neutral-400"
+                            isOperator ? "text-primary-foreground/90" : "text-neutral-400"
                           }`}
                         >
                           {new Date(m.timestamp).toLocaleTimeString([], {
@@ -520,14 +723,14 @@ export default function OperatorChatPanel() {
               />
 
               <input
-                className="flex-1 p-4 outline-none text-neutral-800 bg-neutral-100 rounded-xl border border-neutral-200 transition-all focus:bg-white focus:ring-2 focus:ring-[#3DAB42]"
+                className="flex-1 p-4 outline-none text-neutral-800 bg-neutral-100 rounded-xl border border-neutral-200 transition-all focus:bg-white focus:ring-2 focus:ring-primary"
                 placeholder="Escribí tu mensaje..."
                 value={input}
                 onChange={handleInputChange}
               />
               <button
                 type="submit"
-                className="bg-[#3DAB42] text-white rounded-xl h-14 w-14 flex items-center justify-center text-2xl font-semibold transition-all hover:bg-green-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-primary text-primary-foreground rounded-xl h-14 w-14 flex items-center justify-center text-2xl font-semibold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={connectionStatus === "disconnected"}
               >
                 ➤

@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Activity,
   Coins,
+  MessageCircle,
   MessageSquare,
   Plus,
   Users,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
@@ -328,11 +330,11 @@ function CrmWorkspaceContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
-              <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-muted-foreground">
                 Cargando clientes...
               </div>
             ) : clients.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/60 p-6 text-center text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-muted-foreground">
                 Aún no se registraron clientes. Creá el primero con el
                 formulario lateral.
               </div>
@@ -340,7 +342,7 @@ function CrmWorkspaceContent() {
               clients.slice(0, 8).map((client) => (
                 <div
                   key={client.id}
-                  className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 p-4 sm:flex-row sm:items-center sm:justify-between transition-all hover:shadow-sm hover:border-border/90 hover:bg-background/95"
                 >
                   <div>
                     <p className="font-medium text-foreground">
@@ -423,27 +425,35 @@ function CrmWorkspaceContent() {
 
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
         {isMenuOpen ? (
-          <div className="w-64 space-y-2 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-xl shadow-black/10 backdrop-blur">
+          <div className="w-64 space-y-2 rounded-2xl border border-border/70 bg-background/95 p-4 shadow-xl shadow-black/10 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Acciones rápidas
             </p>
+            <Link href="/crm/chat">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
+              >
+                <MessageCircle className="size-4" /> Chat con operador
+              </Button>
+            </Link>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary"
+              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
               onClick={handleOpenClientDialog}
             >
               <Users className="size-4" /> Registrar nuevo cliente
             </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary"
+              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
               onClick={handleOpenContactDialog}
             >
               <MessageSquare className="size-4" /> Registrar contacto
             </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary"
+              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
               onClick={handleOpenChargeDialog}
             >
               <Wallet className="size-4" /> Acreditar puntos
@@ -453,14 +463,14 @@ function CrmWorkspaceContent() {
 
         <Button
           size="lg"
-          className="h-14 w-14 rounded-full shadow-lg shadow-primary/30"
+          className="h-14 w-14 rounded-full shadow-lg shadow-primary/30 transition-all hover:shadow-xl hover:shadow-primary/40 active:scale-95"
           onClick={() => setIsMenuOpen((prev) => !prev)}
           aria-label={
             isMenuOpen ? "Cerrar menú de acciones" : "Abrir menú de acciones"
           }
         >
           <Plus
-            className={`size-6 transition-transform ${isMenuOpen ? "rotate-45" : ""}`}
+            className={`size-6 transition-transform duration-200 ${isMenuOpen ? "rotate-45" : ""}`}
           />
         </Button>
       </div>

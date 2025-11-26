@@ -23,6 +23,7 @@ model User {
   pointTransactions PointTransaction[] @relation("TransactionPerformedBy")
   dailyChargeChecks DailyChargeCheck[] @relation("DailyChecksPerformedBy")
   contactsCreated   ClientContact[]    @relation("ContactsCreatedBy")
+  chatMessages      ChatMessage[]      @relation("OperatorMessages")
 }
 
 enum UserRole {
@@ -54,6 +55,7 @@ model Client {
   pointTransactions PointTransaction[]
   contacts          ClientContact[]
   dailyChargeChecks DailyChargeCheck[]
+  chatMessages      ChatMessage[]
 }
 
 enum ClientStatus {
@@ -165,4 +167,48 @@ model DailyChargeCheck {
 
   @@unique([clientId, date]) // only one check per client per day
   @@index([date])
+}
+
+// ---------- Chat messages between operators and clients ----------
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  // Client involved in this conversation
+  client         Client  @relation(fields: [clientId], references: [id])
+  clientId       Int
+  clientSocketId String? // Socket ID for real-time correlation
+
+  // Who sent this message
+  senderType MessageSenderType // CLIENT or OPERATOR
+
+  // If sent by operator
+  operator   User? @relation("OperatorMessages", fields: [operatorId], references: [id])
+  operatorId Int?
+
+  // Message content
+  messageType MessageType // TEXT or IMAGE
+  text        String? // for text messages
+  imageUrl    String? // for image messages (base64 or URL)
+  imageName   String? // original filename
+  mimeType    String? // image MIME type
+
+  // Message metadata
+  isRead     Boolean  @default(false)
+  readAt     DateTime?
+  sessionId  String? // Group messages by conversation session
+
+  @@index([clientId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([operatorId, createdAt])
+}
+
+enum MessageSenderType {
+  CLIENT
+  OPERATOR
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
 }

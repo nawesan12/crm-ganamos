@@ -38,7 +38,7 @@ export function MetricCard({
         : "text-muted-foreground";
 
   return (
-    <Card className={cn("border-border/70 bg-background/90", className)}>
+    <Card className={cn("border-border/70 bg-background/90 transition-all hover:shadow-md hover:border-border/90", className)}>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <CardTitle className="text-base font-medium text-muted-foreground">

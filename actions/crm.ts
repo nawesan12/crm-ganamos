@@ -263,11 +263,12 @@ export async function getClientOverviewAction(input: GetClientOverviewInput) {
     prisma.client.findUnique({
       where: { id: data.clientId },
       include: { marketingSource: true },
-    }), //@ts-expect-error bla
+    }),
     prisma.pointTransaction.groupBy({
       by: ["type"],
       _sum: { amount: true },
       where: { clientId: data.clientId },
+      orderBy: { type: "asc" },
     }),
     prisma.pointTransaction.findFirst({
       where: { clientId: data.clientId, type: TransactionType.CHARGE },
@@ -283,10 +284,11 @@ export async function getClientOverviewAction(input: GetClientOverviewInput) {
     throw new Error("Client not found");
   }
 
-  const totalCharged = //@ts-expect-error bla
-    totals.find((t) => t.type === TransactionType.CHARGE)?._sum.amount ?? 0;
-  const totalRedeemed = //@ts-expect-error bla
-    totals.find((t) => t.type === TransactionType.REDEEM)?._sum.amount ?? 0;
+  const chargedGroup = totals.find((t) => t.type === TransactionType.CHARGE);
+  const redeemedGroup = totals.find((t) => t.type === TransactionType.REDEEM);
+
+  const totalCharged = chargedGroup?._sum?.amount ?? 0;
+  const totalRedeemed = redeemedGroup?._sum?.amount ?? 0;
 
   return {
     client,

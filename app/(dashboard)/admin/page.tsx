@@ -492,11 +492,11 @@ function AdminDashboardContent() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {isLoadingDashboard && clients.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
                     Cargando datos de cuentas...
                   </div>
                 ) : onboardingQueue.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
                     No hay cuentas en proceso de incorporación en este momento.
                     Agregue un nuevo cliente para comenzar.
                   </div>
@@ -504,7 +504,7 @@ function AdminDashboardContent() {
                   onboardingQueue.map((client) => (
                     <div
                       key={client.id}
-                      className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/80 p-5 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-3 rounded-xl border border-border/70 bg-background/80 p-5 sm:flex-row sm:items-center sm:justify-between transition-all hover:shadow-sm hover:border-border/90 hover:bg-background/95"
                     >
                       <div className="flex flex-col gap-1">
                         <span className="text-lg font-medium text-foreground">
@@ -558,7 +558,7 @@ function AdminDashboardContent() {
                   Exportar CSV
                 </Button>
               </CardHeader>
-              <CardContent className="overflow-hidden rounded-xl border border-border/60">
+              <CardContent className="overflow-hidden rounded-xl border border-border/70">
                 <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_1fr] bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground sm:grid">
                   <span>Compañero de equipo</span>
                   <span>Rol</span>
@@ -625,11 +625,11 @@ function AdminDashboardContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isLoadingDashboard && cashiers.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
                     Cargando registros de cajeros...
                   </div>
                 ) : sortedCashiers.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/60 p-8 text-center text-muted-foreground">
+                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
                     Todavía no hay cajeros activos. Registrá uno para comenzar a
                     operar.
                   </div>
@@ -637,7 +637,7 @@ function AdminDashboardContent() {
                   sortedCashiers.map((cashier) => (
                     <div
                       key={cashier.id}
-                      className="space-y-4 rounded-xl border border-border/60 bg-background/80 p-5"
+                      className="space-y-4 rounded-xl border border-border/70 bg-background/80 p-5 transition-all hover:shadow-sm hover:border-border/90 hover:bg-background/95"
                     >
                       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -713,7 +713,7 @@ function AdminDashboardContent() {
       {/* Floating quick actions menu */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
         {isQuickMenuOpen && (
-          <div className="w-64 rounded-2xl border border-border/60 bg-background/95 p-4 shadow-xl backdrop-blur-sm">
+          <div className="w-64 rounded-2xl border border-border/70 bg-background/95 p-4 shadow-xl backdrop-blur-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
               Acciones rápidas
             </p>
