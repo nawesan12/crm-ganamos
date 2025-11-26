@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
-import { ArrowLeft, Search, X, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Search, X, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   saveChatMessageAction,
   getChatHistoryAction,
@@ -66,8 +67,8 @@ export default function OperatorChatPanel() {
   const [connectionStatus, setConnectionStatus] = useState<
     "connected" | "connecting" | "disconnected"
   >("connecting");
-  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [currentSessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
 
   const user = useAuthStore((state) => state.user);
 
@@ -122,7 +123,7 @@ export default function OperatorChatPanel() {
       );
     } catch (err) {
       console.error("Error loading chat history:", err);
-      setError("No se pudo cargar el historial del chat");
+      toast.error("No se pudo cargar el historial del chat");
       setChats((prev) =>
         prev.map((c) =>
           c.username === clientUsername
@@ -160,7 +161,7 @@ export default function OperatorChatPanel() {
         imageUrl: message.image ?? null,
         imageName: message.name ?? null,
         mimeType: message.mimeType ?? null,
-        sessionId: null,
+        sessionId: currentSessionId,
       });
     } catch (err) {
       console.error("Error saving message to database:", err);
@@ -168,8 +169,11 @@ export default function OperatorChatPanel() {
   };
 
   useEffect(() => {
-    const s = io("https://chat-backend-cbla.onrender.com", {
-      path: "/chat",
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://chat-backend-cbla.onrender.com";
+    const socketPath = process.env.NEXT_PUBLIC_SOCKET_PATH || "/chat";
+
+    const s = io(socketUrl, {
+      path: socketPath,
       transports: ["websocket"],
     });
 
@@ -179,17 +183,20 @@ export default function OperatorChatPanel() {
     s.on("connect", () => {
       console.log("✅ Conectado como operador");
       setConnectionStatus("connected");
+      toast.success("Conectado al servidor de chat");
       s.emit("join", { role: "operator", name: "Operador 1" });
     });
 
     s.on("disconnect", () => {
       console.log("🔌 Desconectado");
       setConnectionStatus("disconnected");
+      toast.warning("Desconectado del servidor de chat");
     });
 
     s.on("connect_error", (err) => {
       console.error("❌ Error de conexión:", err.message);
       setConnectionStatus("disconnected");
+      toast.error("Error de conexión al servidor de chat");
     });
 
     s.on("newChat", async (data: NewChatPayload) => {
@@ -256,8 +263,8 @@ export default function OperatorChatPanel() {
               text: data.message ?? "",
             };
 
-      setChats((prev) =>
-        prev.map((c) => {
+      setChats((prev) => {
+        const updatedChats = prev.map((c) => {
           if (c.clientId !== data.from) return c;
 
           return {
@@ -267,14 +274,16 @@ export default function OperatorChatPanel() {
               activeClientIdRef.current === data.from ? c.unread : c.unread + 1,
             isClientTyping: false,
           };
-        }),
-      );
+        });
 
-      // Save to database
-      const chat = chats.find((c) => c.clientId === data.from);
-      if (chat) {
-        await saveMessageToDb(chat.username, newMsg, chat.clientDbId);
-      }
+        // Save to database using the updated chat data
+        const chat = updatedChats.find((c) => c.clientId === data.from);
+        if (chat) {
+          saveMessageToDb(chat.username, newMsg, chat.clientDbId);
+        }
+
+        return updatedChats;
+      });
     });
 
     s.on("clientTyping", (data: TypingPayload) => {
@@ -463,8 +472,8 @@ export default function OperatorChatPanel() {
 
   return (
     <div className="flex h-screen bg-neutral-100 text-base text-neutral-800">
-      {/* Sidebar */}
-      <aside className="w-80 bg-white border-r border-neutral-200 flex flex-col overflow-y-auto">
+      {/* Sidebar - Hidden on mobile when chat is active */}
+      <aside className={`w-full md:w-80 bg-white border-r border-neutral-200 flex flex-col overflow-y-auto ${activeClientId ? "hidden md:flex" : "flex"}`}>
         <div className="flex flex-col border-b border-neutral-200">
           <div className="flex items-center justify-between p-6 pb-3">
             <h2 className="font-semibold text-xl text-neutral-900">
@@ -578,14 +587,23 @@ export default function OperatorChatPanel() {
         </div>
       </aside>
 
-      {/* Chat Window */}
-      <main className="flex-1 flex flex-col bg-neutral-50">
+      {/* Chat Window - Hidden on mobile when no active chat */}
+      <main className={`flex-1 flex flex-col bg-neutral-50 ${!activeClientId ? "hidden md:flex" : "flex"}`}>
         {activeChat ? (
           <>
-            <header className="flex items-center justify-between p-6 bg-white border-b border-neutral-200 shadow-sm">
-              <div>
-                <div className="font-semibold text-neutral-900 text-lg flex items-center gap-2">
-                  Chat con {activeChat.username}
+            <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b border-neutral-200 shadow-sm">
+              <div className="flex items-center gap-3 flex-1">
+                {/* Back button for mobile */}
+                <button
+                  onClick={() => setActiveClientId(null)}
+                  className="md:hidden p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
+                  aria-label="Volver a la lista de chats"
+                >
+                  <ArrowLeft className="h-5 w-5 text-neutral-700" />
+                </button>
+                <div className="flex-1">
+                  <div className="font-semibold text-neutral-900 text-base md:text-lg flex items-center gap-2">
+                    Chat con {activeChat.username}
                   {activeChat.isLoadingHistory && (
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   )}
@@ -597,9 +615,10 @@ export default function OperatorChatPanel() {
                       DB: #{activeChat.clientDbId}
                     </span>
                   )}
+                  </div>
                 </div>
               </div>
-              <div className="text-xs text-neutral-500 text-right">
+              <div className="text-xs text-neutral-500 text-right hidden md:block">
                 <div>Total mensajes: {activeChat.messages.length}</div>
                 {activeChat.unread > 0 && (
                   <div className="mt-1 text-red-500 font-medium">
@@ -610,22 +629,6 @@ export default function OperatorChatPanel() {
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-100">
-              {error && (
-                <div className="mx-auto max-w-md bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <div className="font-medium text-red-900 text-sm">Error</div>
-                    <div className="text-red-700 text-sm mt-1">{error}</div>
-                  </div>
-                  <button
-                    onClick={() => setError(null)}
-                    className="text-red-500 hover:text-red-700 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-
               {activeChat.isLoadingHistory && activeChat.messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
@@ -701,13 +704,13 @@ export default function OperatorChatPanel() {
             {/* Input + botones */}
             <form
               onSubmit={sendMessage}
-              className="flex items-center gap-3 border-t border-neutral-200 bg-white p-4"
+              className="flex items-center gap-2 md:gap-3 border-t border-neutral-200 bg-white p-3 md:p-4"
             >
               {/* 🆕 Botón imagen */}
               <button
                 type="button"
                 onClick={handleImageButtonClick}
-                className="h-12 w-12 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-xl hover:bg-neutral-200 transition-all"
+                className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-lg md:text-xl hover:bg-neutral-200 transition-all flex-shrink-0"
                 title="Enviar imagen"
               >
                 📎
@@ -723,14 +726,14 @@ export default function OperatorChatPanel() {
               />
 
               <input
-                className="flex-1 p-4 outline-none text-neutral-800 bg-neutral-100 rounded-xl border border-neutral-200 transition-all focus:bg-white focus:ring-2 focus:ring-primary"
+                className="flex-1 p-3 md:p-4 outline-none text-sm md:text-base text-neutral-800 bg-neutral-100 rounded-xl border border-neutral-200 transition-all focus:bg-white focus:ring-2 focus:ring-primary"
                 placeholder="Escribí tu mensaje..."
                 value={input}
                 onChange={handleInputChange}
               />
               <button
                 type="submit"
-                className="bg-primary text-primary-foreground rounded-xl h-14 w-14 flex items-center justify-center text-2xl font-semibold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-primary text-primary-foreground rounded-xl h-10 w-10 md:h-14 md:w-14 flex items-center justify-center text-xl md:text-2xl font-semibold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                 disabled={connectionStatus === "disconnected"}
               >
                 ➤

@@ -11,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
@@ -97,8 +98,6 @@ function CrmWorkspaceContent() {
     method: PaymentMethod.CASH,
     description: "",
   });
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
@@ -112,7 +111,7 @@ function CrmWorkspaceContent() {
         })
         .catch((err) => {
           console.error("Error loading clients", err);
-          setError("No pudimos cargar los clientes.");
+          toast.error("No pudimos cargar los clientes.");
         });
     });
   }, []);
@@ -136,28 +135,46 @@ function CrmWorkspaceContent() {
 
   const handleCreateClient = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
-    setFeedback(null);
 
     if (!newClient.username.trim()) {
-      setError("Ingresá un identificador de cliente.");
+      toast.error("Ingresá un identificador de cliente.");
       return;
     }
 
+    // Optimistic update - create temporary client
+    const tempClient: ClientRecord = {
+      id: Date.now(), // temporary ID
+      username: newClient.username.trim(),
+      phone: newClient.phone.trim() || null,
+      status: "ACTIVE",
+      pointsBalance: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      marketingSourceId: null,
+    };
+
+    // Add optimistically
+    setClients((prev) => [tempClient, ...prev]);
+    setNewClient({ username: "", phone: "" });
+    setIsClientDialogOpen(false);
+
     startTransition(() => {
       createClientAction({
-        username: newClient.username.trim(),
-        phone: newClient.phone.trim() || undefined,
+        username: tempClient.username,
+        phone: tempClient.phone || undefined,
       })
         .then((client) => {
-          setClients((prev) => [client, ...prev]);
-          setNewClient({ username: "", phone: "" });
-          setFeedback(`Cliente ${client.username} creado correctamente.`);
-          setIsClientDialogOpen(false);
+          // Replace temp client with real one from server
+          setClients((prev) =>
+            prev.map((c) => (c.id === tempClient.id ? client : c))
+          );
+          toast.success(`Cliente ${client.username} creado correctamente.`);
         })
         .catch((err) => {
           console.error("Error creating client", err);
-          setError(
+          // Remove the optimistic update on error
+          setClients((prev) => prev.filter((c) => c.id !== tempClient.id));
+          toast.error(
             "No se pudo crear el cliente. Revisá que el usuario sea único.",
           );
         });
@@ -166,12 +183,10 @@ function CrmWorkspaceContent() {
 
   const handleLogContact = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
-    setFeedback(null);
 
     const clientId = Number.parseInt(contactForm.clientId, 10);
     if (!Number.isFinite(clientId)) {
-      setError("Seleccioná un cliente para registrar el contacto.");
+      toast.error("Seleccioná un cliente para registrar el contacto.");
       return;
     }
 
@@ -185,7 +200,7 @@ function CrmWorkspaceContent() {
         message: contactForm.message.trim() || undefined,
       })
         .then(() => {
-          setFeedback("Contacto registrado correctamente.");
+          toast.success("Contacto registrado correctamente.");
           setContactForm((prev) => ({
             ...prev,
             message: "",
@@ -194,28 +209,46 @@ function CrmWorkspaceContent() {
         })
         .catch((err) => {
           console.error("Error logging contact", err);
-          setError("No se pudo registrar el contacto.");
+          toast.error("No se pudo registrar el contacto.");
         });
     });
   };
 
   const handleRegisterCharge = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
-    setFeedback(null);
 
     const clientId = Number.parseInt(chargeForm.clientId, 10);
     const amount = Number.parseInt(chargeForm.amount, 10);
 
     if (!Number.isFinite(clientId)) {
-      setError("Seleccioná un cliente para acreditar puntos.");
+      toast.error("Seleccioná un cliente para acreditar puntos.");
       return;
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError("Ingresá un monto válido de puntos.");
+      toast.error("Ingresá un monto válido de puntos.");
       return;
     }
+
+    // Optimistic update - update balance immediately
+    const previousBalance = clients.find((c) => c.id === clientId)?.pointsBalance ?? 0;
+    setClients((prev) =>
+      prev.map((item) =>
+        item.id === clientId
+          ? { ...item, pointsBalance: item.pointsBalance + amount }
+          : item,
+      ),
+    );
+
+    // Reset form and close dialog optimistically
+    const formBackup = { ...chargeForm };
+    setChargeForm({
+      clientId: "",
+      amount: "",
+      method: PaymentMethod.CASH,
+      description: "",
+    });
+    setIsChargeDialogOpen(false);
 
     startTransition(() => {
       registerPointChargeAction({
@@ -227,6 +260,7 @@ function CrmWorkspaceContent() {
         cashierId: undefined,
       })
         .then(({ client }) => {
+          // Confirm with server data
           setClients((prev) =>
             prev.map((item) =>
               item.id === client.id
@@ -234,18 +268,20 @@ function CrmWorkspaceContent() {
                 : item,
             ),
           );
-          setFeedback("Carga registrada y saldo actualizado.");
-          setChargeForm({
-            clientId: "",
-            amount: "",
-            method: PaymentMethod.CASH,
-            description: "",
-          });
-          setIsChargeDialogOpen(false);
+          toast.success("Carga registrada y saldo actualizado.");
         })
         .catch((err) => {
           console.error("Error registering charge", err);
-          setError("No se pudo registrar la carga.");
+          // Rollback optimistic update on error
+          setClients((prev) =>
+            prev.map((item) =>
+              item.id === clientId
+                ? { ...item, pointsBalance: previousBalance }
+                : item,
+            ),
+          );
+          setChargeForm(formBackup);
+          toast.error("No se pudo registrar la carga.");
         });
     });
   };
@@ -304,19 +340,6 @@ function CrmWorkspaceContent() {
           description="Saldo total disponible en todas las cuentas"
         />
       </div>
-
-      {(feedback || error) && (
-        <div
-          className={
-            "rounded-lg border p-4 text-sm " +
-            (error
-              ? "border-destructive/60 text-destructive"
-              : "border-emerald-500/60 text-emerald-600")
-          }
-        >
-          {feedback ?? error}
-        </div>
-      )}
 
       <div className="grid gap-6">
         <Card className="border-border/70 bg-background/90">
