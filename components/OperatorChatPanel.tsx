@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
-import { ArrowLeft, Search, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Search, X, Loader2, UserPlus, Download } from "lucide-react";
 import { toast } from "sonner";
 import {
   saveChatMessageAction,
   getChatHistoryAction,
   getClientByUsernameAction,
-  markMessagesAsReadAction,
 } from "@/actions/chat";
+import { createClientAction } from "@/actions/crm";
 import { MessageSenderType, MessageType } from "@prisma/client";
 import { useAuthStore } from "@/stores/auth-store";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // ---------------- TYPES ----------------
 
@@ -67,8 +70,11 @@ export default function OperatorChatPanel() {
   const [connectionStatus, setConnectionStatus] = useState<
     "connected" | "connecting" | "disconnected"
   >("connecting");
-  const [isPending, startTransition] = useTransition();
   const [currentSessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isCreateClientDialogOpen, setIsCreateClientDialogOpen] = useState(false);
+  const [newClientData, setNewClientData] = useState({ username: "", phone: "" });
+  const [clientToCreate, setClientToCreate] = useState<string | null>(null);
 
   const user = useAuthStore((state) => state.user);
 
@@ -227,6 +233,8 @@ export default function OperatorChatPanel() {
           );
           await loadChatHistory(data.username, client.id);
         } else {
+          // Client doesn't exist in database - show notification
+          toast.info(`Nuevo cliente: ${data.username}. Hacé clic en el ícono de usuario para guardar.`);
           setChats((prev) =>
             prev.map((c) =>
               c.clientId === data.clientId ? { ...c, isLoadingHistory: false } : c
@@ -317,6 +325,57 @@ export default function OperatorChatPanel() {
     setChats((prev) =>
       prev.map((c) => (c.clientId === clientId ? { ...c, unread: 0 } : c)),
     );
+  };
+
+  const handleOpenCreateClientDialog = (username: string) => {
+    setClientToCreate(username);
+    setNewClientData({ username, phone: "" });
+    setIsCreateClientDialogOpen(true);
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newClientData.username.trim()) {
+      toast.error("El nombre de usuario es requerido");
+      return;
+    }
+
+    try {
+      const client = await createClientAction({
+        username: newClientData.username.trim(),
+        phone: newClientData.phone.trim() || undefined,
+      });
+
+      // Update chat with database client ID
+      setChats((prev) =>
+        prev.map((c) =>
+          c.username === newClientData.username
+            ? { ...c, clientDbId: client.id }
+            : c
+        )
+      );
+
+      // Load history for the newly created client
+      await loadChatHistory(client.username, client.id);
+
+      toast.success(`Cliente ${client.username} guardado correctamente`);
+      setIsCreateClientDialogOpen(false);
+      setNewClientData({ username: "", phone: "" });
+      setClientToCreate(null);
+    } catch (err) {
+      console.error("Error creating client:", err);
+      toast.error("No se pudo guardar el cliente. Verificá que el usuario sea único.");
+    }
+  };
+
+  const handleDownloadImage = (imageUrl: string, imageName?: string) => {
+    const link = document.createElement("a");
+    link.href = imageUrl;
+    link.download = imageName || `image_${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const notifyOperatorTyping = (isTyping: boolean) => {
@@ -549,21 +608,37 @@ export default function OperatorChatPanel() {
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`font-semibold truncate ${
-                      isActive ? "text-white" : "text-neutral-900"
-                    }`}
-                  >
-                    {c.username}
-                  </span>
-                  {c.unread > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white animate-pulse">
-                      {c.unread}
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span
+                      className={`font-semibold truncate ${
+                        isActive ? "text-white" : "text-neutral-900"
+                      }`}
+                    >
+                      {c.username}
                     </span>
-                  )}
-                  {c.isLoadingHistory && (
-                    <Loader2 className="ml-2 h-4 w-4 animate-spin text-neutral-400" />
-                  )}
+                    {!c.clientDbId && (
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}
+                        title="Cliente no guardado en CRM"
+                      >
+                        <UserPlus className="h-3 w-3" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {c.unread > 0 && (
+                      <span className="inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white animate-pulse">
+                        {c.unread}
+                      </span>
+                    )}
+                    {c.isLoadingHistory && (
+                      <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
+                    )}
+                  </div>
                 </div>
                 <div
                   className={`text-sm truncate ${
@@ -604,6 +679,15 @@ export default function OperatorChatPanel() {
                 <div className="flex-1">
                   <div className="font-semibold text-neutral-900 text-base md:text-lg flex items-center gap-2">
                     Chat con {activeChat.username}
+                    {!activeChat.clientDbId && (
+                      <button
+                        onClick={() => handleOpenCreateClientDialog(activeChat.username)}
+                        className="p-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors"
+                        title="Guardar como cliente"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </button>
+                    )}
                   {activeChat.isLoadingHistory && (
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   )}
@@ -656,14 +740,21 @@ export default function OperatorChatPanel() {
                       {/* 🆕 Render imagen si existe */}
                       {m.image && (
                         <div className="mb-2">
-                          <img
-                            src={m.image}
-                            alt={m.name || "Imagen"}
-                            className="rounded-lg max-h-64 w-auto cursor-pointer"
-                            onClick={() => {
-                              window.open(m.image, "_blank");
-                            }}
-                          />
+                          <div className="relative group">
+                            <img
+                              src={m.image}
+                              alt={m.name || "Imagen"}
+                              className="rounded-lg max-h-64 w-auto cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => setSelectedImage(m.image!)}
+                            />
+                            <button
+                              onClick={() => handleDownloadImage(m.image!, m.name)}
+                              className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Descargar imagen"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                          </div>
                           {m.name && (
                             <div className="mt-1 text-[11px] opacity-80">
                               {m.name}
@@ -758,6 +849,96 @@ export default function OperatorChatPanel() {
           </div>
         )}
       </main>
+
+      {/* Image Preview Modal */}
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-2">
+          <DialogHeader>
+            <DialogTitle>Vista previa de imagen</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center bg-neutral-100 rounded-lg p-4 overflow-auto">
+            {selectedImage && (
+              <img
+                src={selectedImage}
+                alt="Vista previa"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => setSelectedImage(null)}
+            >
+              Cerrar
+            </Button>
+            {selectedImage && (
+              <Button
+                onClick={() => {
+                  handleDownloadImage(selectedImage);
+                  setSelectedImage(null);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Client Dialog */}
+      <Dialog open={isCreateClientDialogOpen} onOpenChange={setIsCreateClientDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guardar cliente en CRM</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateClient} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="new-client-username" className="text-sm font-medium">
+                Usuario / Identificador *
+              </label>
+              <Input
+                id="new-client-username"
+                value={newClientData.username}
+                onChange={(e) => setNewClientData((prev) => ({ ...prev, username: e.target.value }))}
+                placeholder="Nombre de usuario"
+                required
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="new-client-phone" className="text-sm font-medium">
+                Teléfono (opcional)
+              </label>
+              <Input
+                id="new-client-phone"
+                value={newClientData.phone}
+                onChange={(e) => setNewClientData((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="5491130000000"
+                className="w-full"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsCreateClientDialogOpen(false);
+                  setNewClientData({ username: "", phone: "" });
+                  setClientToCreate(null);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Guardar Cliente
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
