@@ -145,57 +145,87 @@ export default function OperatorChatPanel() {
   const loadRecentChats = async () => {
     try {
       setIsLoadingChats(true);
+      logger.log("🔄 Loading recent chats...");
+
       const recentChats = await getRecentChatsAction();
+      logger.log(`📥 Received ${recentChats.length} chats from server`);
 
       const chatsData: Chat[] = await Promise.all(
-        recentChats.map(async ({ client, unreadCount, isGuest }) => {
-          // Load full history for each client (or guest)
-          let history;
+        recentChats.map(async ({ client, unreadCount, isGuest }, index) => {
+          try {
+            logger.log(`Loading chat ${index + 1}/${recentChats.length}: ${client.username} (guest: ${isGuest})`);
 
-          if (isGuest) {
-            // For guests, use guestUsername to load history
-            history = await getChatHistoryAction({
-              guestUsername: client.username,
-              limit: 100
-            });
-          } else {
-            // For registered clients, use clientId
-            history = await getChatHistoryAction({
-              clientId: client.id,
-              limit: 100
-            });
+            // Load full history for each client (or guest)
+            let history;
+
+            if (isGuest) {
+              // For guests, use guestUsername to load history
+              logger.log(`  → Loading guest history for ${client.username}`);
+              history = await getChatHistoryAction({
+                guestUsername: client.username,
+                limit: 100
+              });
+            } else {
+              // For registered clients, use clientId
+              logger.log(`  → Loading client history for ID ${client.id}`);
+              history = await getChatHistoryAction({
+                clientId: client.id,
+                limit: 100
+              });
+            }
+
+            logger.log(`  ✓ Loaded ${history.length} messages`);
+
+            const messages: Message[] = history.map((msg: any) => ({
+              from: msg.senderType === MessageSenderType.CLIENT ? "client" : "operator",
+              text: msg.text ?? undefined,
+              image: msg.imageUrl ?? undefined,
+              mimeType: msg.mimeType ?? undefined,
+              name: msg.imageName ?? undefined,
+              timestamp: msg.createdAt.toISOString(),
+              id: msg.id,
+              isRead: msg.isRead,
+              operatorId: msg.operatorId ?? undefined,
+              operatorName: msg.operator?.name ?? undefined,
+            }));
+
+            return {
+              clientId: `client_${client.id}`, // Create a consistent clientId
+              username: client.username,
+              messages,
+              unread: unreadCount,
+              isClientTyping: false,
+              clientDbId: isGuest ? undefined : client.id,
+              isLoadingHistory: false,
+            };
+          } catch (chatError) {
+            logger.error(`  ✗ Error loading chat for ${client.username}:`, chatError);
+            // Return minimal chat data even if history fails to load
+            return {
+              clientId: `client_${client.id}`,
+              username: client.username,
+              messages: [],
+              unread: unreadCount,
+              isClientTyping: false,
+              clientDbId: isGuest ? undefined : client.id,
+              isLoadingHistory: false,
+            };
           }
-
-          const messages: Message[] = history.map((msg: any) => ({
-            from: msg.senderType === MessageSenderType.CLIENT ? "client" : "operator",
-            text: msg.text ?? undefined,
-            image: msg.imageUrl ?? undefined,
-            mimeType: msg.mimeType ?? undefined,
-            name: msg.imageName ?? undefined,
-            timestamp: msg.createdAt.toISOString(),
-            id: msg.id,
-            isRead: msg.isRead,
-            operatorId: msg.operatorId ?? undefined,
-            operatorName: msg.operator?.name ?? undefined,
-          }));
-
-          return {
-            clientId: `client_${client.id}`, // Create a consistent clientId
-            username: client.username,
-            messages,
-            unread: unreadCount,
-            isClientTyping: false,
-            clientDbId: isGuest ? undefined : client.id,
-            isLoadingHistory: false,
-          };
         })
       );
 
       setChats(chatsData);
-      logger.log(`✅ Loaded ${chatsData.length} chats from database`);
-    } catch (err) {
-      logger.error("Error loading recent chats:", err);
-      notification.error("No se pudieron cargar los chats recientes");
+      logger.log(`✅ Successfully loaded ${chatsData.length} chats from database`);
+    } catch (err: any) {
+      logger.error("❌ Error loading recent chats:", err);
+      logger.error("Error details:", {
+        message: err?.message,
+        code: err?.code,
+        stack: err?.stack,
+      });
+      notification.error(`Error al cargar chats: ${err?.message || "Error desconocido"}`);
+      // Set empty chats array instead of leaving it undefined
+      setChats([]);
     } finally {
       setIsLoadingChats(false);
     }

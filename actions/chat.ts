@@ -311,34 +311,44 @@ export async function searchMessagesAction(input: SearchMessagesInput) {
  * -------------------------------------- */
 
 export async function getRecentChatsAction() {
-  // Get all clients who have chat messages
-  const clients = await prisma.client.findMany({
-    where: {
-      chatMessages: {
-        some: {},
+  try {
+    // Get all clients who have chat messages
+    const clients = await prisma.client.findMany({
+      where: {
+        chatMessages: {
+          some: {},
+        },
       },
-    },
-    select: {
-      id: true,
-      username: true,
-      phone: true,
-      status: true,
-    },
-  });
+      select: {
+        id: true,
+        username: true,
+        phone: true,
+        status: true,
+      },
+    });
 
-  // Get unique guest usernames from messages without clientId
-  const guestUsernames = await prisma.chatMessage.groupBy({
-    by: ['guestUsername'],
-    where: {
-      clientId: null,
-      guestUsername: {
-        not: null,
-      },
-    },
-    _max: {
-      guestPhone: true,
-    },
-  });
+    // Get unique guest usernames from messages without clientId
+    // Wrap in try-catch in case guestUsername field doesn't exist in production DB
+    let guestUsernames: Array<{ guestUsername: string | null; _max: { guestPhone: string | null } }> = [];
+
+    try {
+      guestUsernames = await prisma.chatMessage.groupBy({
+        by: ['guestUsername'],
+        where: {
+          clientId: null,
+          guestUsername: {
+            not: null,
+          },
+        },
+        _max: {
+          guestPhone: true,
+        },
+      });
+    } catch (guestError: any) {
+      // If guestUsername field doesn't exist in DB, skip guest loading
+      console.error("⚠️  Could not load guest chats (field may not exist in DB):", guestError.message);
+      // Continue without guests
+    }
 
   // For each client, get their last message and unread count
   const clientChats = await Promise.all(
@@ -430,4 +440,14 @@ export async function getRecentChatsAction() {
     const bTime = b.lastMessage?.createdAt?.getTime() ?? 0;
     return bTime - aTime;
   });
+  } catch (error: any) {
+    console.error("❌ Error in getRecentChatsAction:", error);
+    console.error("Error details:", {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+    });
+    // Return empty array instead of throwing to prevent complete failure
+    return [];
+  }
 }
