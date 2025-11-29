@@ -978,10 +978,10 @@ export default function OperatorChatPanel() {
               const aLastMessage = a.messages[a.messages.length - 1];
               const bLastMessage = b.messages[b.messages.length - 1];
 
-              // If no messages, put at the bottom
+              // If no messages, put new chats at the top
               if (!aLastMessage && !bLastMessage) return 0;
-              if (!aLastMessage) return 1;
-              if (!bLastMessage) return -1;
+              if (!aLastMessage) return -1; // Put chat with no messages first
+              if (!bLastMessage) return 1;  // Put chat with no messages first
 
               // Sort by timestamp descending (most recent first)
               const aTime = new Date(aLastMessage.timestamp || 0).getTime();
