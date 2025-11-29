@@ -567,27 +567,9 @@ export default function OperatorChatPanel() {
 
           logger.log(`✅ Adding broadcast message to chat ${c.username}`);
 
-          // Save message from other operator to database asynchronously
-          saveMessageToDb(c.username, newMsg, c.clientDbId).then((savedMessageId) => {
-            if (savedMessageId) {
-              setChats((prevChats) =>
-                prevChats.map((chat) =>
-                  chat.clientId === data.clientId
-                    ? {
-                        ...chat,
-                        messages: chat.messages.map((m) =>
-                          m.timestamp === newMsg.timestamp && m.operatorId === data.operatorId && !m.id
-                            ? { ...m, id: savedMessageId }
-                            : m
-                        ),
-                      }
-                    : chat
-                )
-              );
-            }
-          }).catch((err) => {
-            logger.error("Error saving broadcast message:", err);
-          });
+          // Note: We DON'T save to DB here because the sender already saved it.
+          // This prevents duplicate messages in the database.
+          // The message will be loaded from DB when we refresh or load chat history.
 
           return {
             ...c,
@@ -727,14 +709,6 @@ export default function OperatorChatPanel() {
       operatorName: user.name,
     };
 
-    socketRef.current.emit("operatorMessage", {
-      to: activeChat.clientId,
-      type: "text",
-      message: input,
-      operatorId: user.id,
-      operatorName: user.name,
-    });
-
     // Add message optimistically (without ID)
     setChats((prev) =>
       prev.map((c) =>
@@ -747,7 +721,7 @@ export default function OperatorChatPanel() {
       ),
     );
 
-    // Save to database and update with ID
+    // Save to database FIRST (before broadcasting) to prevent race condition
     logger.log(`💾 Saving message to DB for ${activeChat.username}`);
     const savedMessageId = await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
     logger.log(`📝 Message saved with ID: ${savedMessageId}`);
@@ -771,6 +745,15 @@ export default function OperatorChatPanel() {
     } else {
       logger.error(`❌ Failed to save message - no ID returned`);
     }
+
+    // NOW broadcast to other operators (after DB save completes)
+    socketRef.current.emit("operatorMessage", {
+      to: activeChat.clientId,
+      type: "text",
+      message: input,
+      operatorId: user.id,
+      operatorName: user.name,
+    });
 
     if (operatorTypingTimeoutRef.current) {
       clearTimeout(operatorTypingTimeoutRef.current);
@@ -816,18 +799,6 @@ export default function OperatorChatPanel() {
         operatorName: user.name,
       };
 
-      // Emitir al servidor
-      socketRef.current?.emit("operatorMessage", {
-        to: activeChat.clientId,
-        type: "image",
-        image: base64,
-        name: file.name,
-        mimeType: file.type,
-        size: file.size,
-        operatorId: user.id,
-        operatorName: user.name,
-      });
-
       // Add message optimistically (without ID)
       setChats((prev) =>
         prev.map((c) =>
@@ -840,7 +811,7 @@ export default function OperatorChatPanel() {
         ),
       );
 
-      // Save to database and update with ID
+      // Save to database FIRST (before broadcasting) to prevent race condition
       logger.log(`💾 Saving image message to DB for ${activeChat.username}`);
       const savedMessageId = await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
       logger.log(`📝 Image message saved with ID: ${savedMessageId}`);
@@ -864,6 +835,18 @@ export default function OperatorChatPanel() {
       } else {
         logger.error(`❌ Failed to save image message - no ID returned`);
       }
+
+      // NOW broadcast to other operators (after DB save completes)
+      socketRef.current?.emit("operatorMessage", {
+        to: activeChat.clientId,
+        type: "image",
+        image: base64,
+        name: file.name,
+        mimeType: file.type,
+        size: file.size,
+        operatorId: user.id,
+        operatorName: user.name,
+      });
 
       e.target.value = "";
     };
