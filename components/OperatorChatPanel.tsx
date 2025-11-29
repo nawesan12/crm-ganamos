@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
-import { ArrowLeft, Search, X, Loader2, UserPlus, Download } from "lucide-react";
+import { ArrowLeft, Search, X, Loader2, UserPlus, Download, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useNotification } from "@/lib/useNotification";
 import { soundManager } from "@/lib/sound-notifications";
 import { useNotificationSettings } from "@/stores/notification-settings-store";
@@ -94,6 +95,7 @@ export default function OperatorChatPanel() {
   const user = useAuthStore((state) => state.user);
   const notification = useNotification();
   const { getEffectiveVolume } = useNotificationSettings();
+  const { theme, setTheme } = useTheme();
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -912,17 +914,30 @@ export default function OperatorChatPanel() {
   // ---------------- RENDER ----------------
 
   return (
-    <div className="flex h-screen bg-neutral-100 text-base text-neutral-800">
+    <div className="flex h-screen bg-neutral-100 dark:bg-neutral-900 text-base text-neutral-800 dark:text-neutral-200">
       {/* Sidebar - Hidden on mobile when chat is active */}
-      <aside className={`w-full md:w-80 bg-white border-r border-neutral-200 flex flex-col overflow-y-auto ${activeClientId ? "hidden md:flex" : "flex"}`}>
-        <div className="flex flex-col border-b border-neutral-200">
+      <aside className={`w-full md:w-80 bg-white dark:bg-neutral-800 border-r border-neutral-200 dark:border-neutral-700 flex flex-col overflow-y-auto ${activeClientId ? "hidden md:flex" : "flex"}`}>
+        <div className="flex flex-col border-b border-neutral-200 dark:border-neutral-700">
           <div className="flex items-center justify-between p-6 pb-3">
-            <h2 className="font-semibold text-xl text-neutral-900">
+            <h2 className="font-semibold text-xl text-neutral-900 dark:text-neutral-100">
               Chats activos
             </h2>
-            <div className="flex items-center gap-1.5 text-xs text-neutral-600">
-              <span className={`h-2 w-2 rounded-full ${statusDotClass} animate-pulse`} />
-              <span>{statusLabel}</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                ) : (
+                  <Moon className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                )}
+              </button>
+              <div className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
+                <span className={`h-2 w-2 rounded-full ${statusDotClass} animate-pulse`} />
+                <span>{statusLabel}</span>
+              </div>
             </div>
           </div>
           <div className="px-6 pb-2">
@@ -933,12 +948,12 @@ export default function OperatorChatPanel() {
                 placeholder="Buscar chats..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                className="w-full pl-10 pr-10 py-2 text-sm border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -947,7 +962,7 @@ export default function OperatorChatPanel() {
           </div>
           <div className="px-6 pb-3 pt-2">
             <Link href="/crm">
-              <button className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-all">
+              <button className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-primary dark:text-primary-foreground bg-primary/10 dark:bg-primary/20 hover:bg-primary/20 dark:hover:bg-primary/30 rounded-lg transition-all">
                 <ArrowLeft className="h-4 w-4" />
                 Volver al CRM
               </button>
@@ -956,12 +971,12 @@ export default function OperatorChatPanel() {
         </div>
 
         {isLoadingChats ? (
-          <p className="p-4 text-neutral-400 text-center text-sm">
+          <p className="p-4 text-neutral-400 dark:text-neutral-500 text-center text-sm">
             <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
             Cargando chats...
           </p>
         ) : chats.length === 0 ? (
-          <p className="p-4 text-neutral-400 text-center text-sm">
+          <p className="p-4 text-neutral-400 dark:text-neutral-500 text-center text-sm">
             No hay chats activos
           </p>
         ) : null}
@@ -1006,14 +1021,14 @@ export default function OperatorChatPanel() {
                 className={`w-full text-left p-4 rounded-xl cursor-pointer transition-all mb-1.5 ${
                   isActive
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                    : "border-transparent text-neutral-700 hover:bg-neutral-100"
+                    : "border-transparent text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span
                       className={`font-semibold truncate ${
-                        isActive ? "text-white" : "text-neutral-900"
+                        isActive ? "text-white" : "text-neutral-900 dark:text-neutral-100"
                       }`}
                     >
                       {c.username}
@@ -1044,7 +1059,7 @@ export default function OperatorChatPanel() {
                 </div>
                 <div
                   className={`text-sm truncate ${
-                    isActive ? "text-primary-foreground/90" : "text-neutral-500"
+                    isActive ? "text-primary-foreground/90" : "text-neutral-500 dark:text-neutral-400"
                   }`}
                 >
                   {lastMessage}
@@ -1065,26 +1080,26 @@ export default function OperatorChatPanel() {
       </aside>
 
       {/* Chat Window - Hidden on mobile when no active chat */}
-      <main className={`flex-1 flex flex-col bg-neutral-50 ${!activeClientId ? "hidden md:flex" : "flex"}`}>
+      <main className={`flex-1 flex flex-col bg-neutral-50 dark:bg-neutral-900 ${!activeClientId ? "hidden md:flex" : "flex"}`}>
         {activeChat ? (
           <>
-            <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b border-neutral-200 shadow-sm">
+            <header className="flex items-center justify-between p-4 md:p-6 bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm">
               <div className="flex items-center gap-3 flex-1">
                 {/* Back button for mobile */}
                 <button
                   onClick={() => setActiveClientId(null)}
-                  className="md:hidden p-2 -ml-2 hover:bg-neutral-100 rounded-lg transition-colors"
+                  className="md:hidden p-2 -ml-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
                   aria-label="Volver a la lista de chats"
                 >
                   <ArrowLeft className="h-5 w-5 text-neutral-700" />
                 </button>
                 <div className="flex-1">
-                  <div className="font-semibold text-neutral-900 text-base md:text-lg flex items-center gap-2">
+                  <div className="font-semibold text-neutral-900 dark:text-neutral-100 text-base md:text-lg flex items-center gap-2">
                     Chat con {activeChat.username}
                     {!activeChat.clientDbId && (
                       <button
                         onClick={() => handleOpenCreateClientDialog(activeChat.username)}
-                        className="p-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors"
+                        className="p-1.5 bg-primary/10 dark:bg-primary/20 hover:bg-primary/20 dark:hover:bg-primary/30 text-primary dark:text-primary-foreground rounded-lg transition-colors"
                         title="Guardar como cliente"
                       >
                         <UserPlus className="h-4 w-4" />
@@ -1094,17 +1109,17 @@ export default function OperatorChatPanel() {
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   )}
                 </div>
-                <div className="text-xs text-neutral-500 flex items-center gap-2">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-2">
                   Cliente ID: {activeChat.clientId}
                   {activeChat.clientDbId && (
-                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-medium">
+                    <span className="px-2 py-0.5 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-foreground rounded text-[10px] font-medium">
                       DB: #{activeChat.clientDbId}
                     </span>
                   )}
                   </div>
                 </div>
               </div>
-              <div className="text-xs text-neutral-500 text-right hidden md:block">
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 text-right hidden md:block">
                 <div>Total mensajes: {activeChat.messages.length}</div>
                 {activeChat.unread > 0 && (
                   <div className="mt-1 text-red-500 font-medium">
@@ -1114,9 +1129,9 @@ export default function OperatorChatPanel() {
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-100">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-100 dark:bg-neutral-900">
               {activeChat.isLoadingHistory && activeChat.messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                <div className="flex flex-col items-center justify-center py-12 text-neutral-500 dark:text-neutral-400">
                   <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
                   <p className="text-sm">Cargando historial del chat...</p>
                 </div>
@@ -1135,7 +1150,7 @@ export default function OperatorChatPanel() {
                   >
                     {/* Show operator name for messages from other operators */}
                     {isOperator && !isCurrentUser && m.operatorName && (
-                      <div className="text-xs text-neutral-500 mb-1 ml-2 font-medium">
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1 ml-2 font-medium">
                         {m.operatorName}
                       </div>
                     )}
@@ -1143,7 +1158,7 @@ export default function OperatorChatPanel() {
                       className={`p-4 rounded-2xl break-words text-sm ${
                         isOperator
                           ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 rounded-br-lg"
-                          : "bg-white text-neutral-800 shadow-sm border border-neutral-200 rounded-bl-lg"
+                          : "bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 shadow-sm border border-neutral-200 dark:border-neutral-700 rounded-bl-lg"
                       }`}
                     >
                       {/* 🆕 Render imagen si existe */}
@@ -1234,7 +1249,7 @@ export default function OperatorChatPanel() {
               })}
 
               {activeChat.isClientTyping && (
-                <div className="mr-auto text-sm text-neutral-500 italic">
+                <div className="mr-auto text-sm text-neutral-500 dark:text-neutral-400 italic">
                   {activeChat.username} está escribiendo...
                 </div>
               )}
@@ -1245,13 +1260,13 @@ export default function OperatorChatPanel() {
             {/* Input + botones */}
             <form
               onSubmit={sendMessage}
-              className="flex items-center gap-2 md:gap-3 border-t border-neutral-200 bg-white p-3 md:p-4"
+              className="flex items-center gap-2 md:gap-3 border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-3 md:p-4"
             >
               {/* 🆕 Botón imagen */}
               <button
                 type="button"
                 onClick={handleImageButtonClick}
-                className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-lg md:text-xl hover:bg-neutral-200 transition-all flex-shrink-0"
+                className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 flex items-center justify-center text-lg md:text-xl hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-all flex-shrink-0"
                 title="Enviar imagen"
               >
                 📎
@@ -1267,7 +1282,7 @@ export default function OperatorChatPanel() {
               />
 
               <input
-                className="flex-1 p-3 md:p-4 outline-none text-sm md:text-base text-neutral-800 bg-neutral-100 rounded-xl border border-neutral-200 transition-all focus:bg-white focus:ring-2 focus:ring-primary"
+                className="flex-1 p-3 md:p-4 outline-none text-sm md:text-base text-neutral-800 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-700 rounded-xl border border-neutral-200 dark:border-neutral-600 transition-all focus:bg-white dark:focus:bg-neutral-800 focus:ring-2 focus:ring-primary placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
                 placeholder="Escribí tu mensaje..."
                 value={input}
                 onChange={handleInputChange}
@@ -1282,7 +1297,7 @@ export default function OperatorChatPanel() {
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 bg-neutral-50">
+          <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900">
             <span
               className="text-7xl mb-4"
               role="img"
@@ -1290,10 +1305,10 @@ export default function OperatorChatPanel() {
             >
               💬
             </span>
-            <p className="text-xl font-semibold mb-1 text-neutral-700">
+            <p className="text-xl font-semibold mb-1 text-neutral-700 dark:text-neutral-300">
               Seleccioná un chat para empezar
             </p>
-            <p className="text-base text-neutral-500">
+            <p className="text-base text-neutral-500 dark:text-neutral-400">
               Los chats de clientes nuevos aparecerán en la lista.
             </p>
           </div>
