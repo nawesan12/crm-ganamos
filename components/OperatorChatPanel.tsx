@@ -399,6 +399,13 @@ export default function OperatorChatPanel() {
 
     // 🆕 Soporte texto + imagen del cliente
     s.on("incomingMessage", async (data: IncomingMessagePayload) => {
+      logger.log("📨 Incoming message from client:", {
+        from: data.from,
+        type: data.type,
+        hasMessage: !!data.message,
+        hasImage: !!data.image
+      });
+
       const base = {
         from: "client" as const,
         timestamp: new Date().toISOString(),
@@ -423,10 +430,43 @@ export default function OperatorChatPanel() {
         soundManager.playSound('info', volume);
       }
 
-      // Add message optimistically
-      setChats((prev) =>
-        prev.map((c) => {
+      // Find chat BEFORE state update to get current data
+      const existingChat = chats.find((c) => c.clientId === data.from);
+
+      if (!existingChat) {
+        logger.warn("⚠️ Chat not found for incoming message:", {
+          clientId: data.from,
+          availableChats: chats.map(c => c.clientId)
+        });
+      }
+
+      // Add message optimistically and save to DB
+      setChats((prev) => {
+        return prev.map((c) => {
           if (c.clientId !== data.from) return c;
+
+          // Save to database asynchronously (don't await here to avoid blocking UI)
+          saveMessageToDb(c.username, newMsg, c.clientDbId).then((savedMessageId) => {
+            if (savedMessageId) {
+              // Update with database ID
+              setChats((prevChats) =>
+                prevChats.map((chat) =>
+                  chat.clientId === data.from
+                    ? {
+                        ...chat,
+                        messages: chat.messages.map((m) =>
+                          m.timestamp === newMsg.timestamp && !m.id
+                            ? { ...m, id: savedMessageId }
+                            : m
+                        ),
+                      }
+                    : chat
+                )
+              );
+            }
+          }).catch((err) => {
+            logger.error("Error saving incoming message:", err);
+          });
 
           return {
             ...c,
@@ -435,30 +475,8 @@ export default function OperatorChatPanel() {
               activeClientIdRef.current === data.from ? c.unread : c.unread + 1,
             isClientTyping: false,
           };
-        })
-      );
-
-      // Save to database and update with ID
-      const chat = chats.find((c) => c.clientId === data.from);
-      if (chat) {
-        const savedMessageId = await saveMessageToDb(chat.username, newMsg, chat.clientDbId);
-        if (savedMessageId) {
-          setChats((prev) =>
-            prev.map((c) =>
-              c.clientId === data.from
-                ? {
-                    ...c,
-                    messages: c.messages.map((m) =>
-                      m.timestamp === newMsg.timestamp && !m.id
-                        ? { ...m, id: savedMessageId }
-                        : m
-                    ),
-                  }
-                : c
-            )
-          );
-        }
-      }
+        });
+      });
     });
 
     s.on("clientTyping", (data: TypingPayload) => {
@@ -512,6 +530,28 @@ export default function OperatorChatPanel() {
 
           if (messageExists) return c;
 
+          // Save message from other operator to database asynchronously
+          saveMessageToDb(c.username, newMsg, c.clientDbId).then((savedMessageId) => {
+            if (savedMessageId) {
+              setChats((prevChats) =>
+                prevChats.map((chat) =>
+                  chat.clientId === data.clientId
+                    ? {
+                        ...chat,
+                        messages: chat.messages.map((m) =>
+                          m.timestamp === newMsg.timestamp && m.operatorId === data.operatorId && !m.id
+                            ? { ...m, id: savedMessageId }
+                            : m
+                        ),
+                      }
+                    : chat
+                )
+              );
+            }
+          }).catch((err) => {
+            logger.error("Error saving broadcast message:", err);
+          });
+
           return {
             ...c,
             messages: [...c.messages, newMsg],
@@ -521,32 +561,11 @@ export default function OperatorChatPanel() {
         return updatedChats;
       });
 
-      // Save message from other operator to database
-      const chat = chats.find((c) => c.clientId === data.clientId);
-      if (chat) {
-        const savedMessageId = await saveMessageToDb(chat.username, newMsg, chat.clientDbId);
-        if (savedMessageId) {
-          setChats((prev) =>
-            prev.map((c) =>
-              c.clientId === data.clientId
-                ? {
-                    ...c,
-                    messages: c.messages.map((m) =>
-                      m.timestamp === newMsg.timestamp && m.operatorId === data.operatorId && !m.id
-                        ? { ...m, id: savedMessageId }
-                        : m
-                    ),
-                  }
-                : c
-            )
-          );
-        }
-      }
-
       // Show notification if message is for a different chat
       if (activeClientIdRef.current !== data.clientId) {
+        const targetChat = chats.find((c) => c.clientId === data.clientId);
         notification.info(
-          `${data.operatorName} envió un mensaje a ${chat?.username || "un cliente"}`
+          `${data.operatorName} envió un mensaje a ${targetChat?.username || "un cliente"}`
         );
       }
     });
