@@ -100,6 +100,13 @@ export default function OperatorChatPanel() {
   const fileInputRef = useRef<HTMLInputElement | null>(null); // 🆕 para imágenes
 
   const activeClientIdRef = useRef<string | null>(null);
+  const userIdRef = useRef<number | undefined>(undefined);
+
+  // Keep userIdRef in sync with current user
+  useEffect(() => {
+    userIdRef.current = user?.id;
+  }, [user]);
+
   useEffect(() => {
     activeClientIdRef.current = activeClientId;
 
@@ -496,9 +503,22 @@ export default function OperatorChatPanel() {
 
     // Listen for messages from other operators
     s.on("operatorBroadcast", async (data: any) => {
+      logger.log("📡 Received operatorBroadcast event:", {
+        clientId: data.clientId,
+        operatorId: data.operatorId,
+        operatorName: data.operatorName,
+        type: data.type,
+        currentUserId: userIdRef.current,
+        hasMessage: !!data.message,
+        hasImage: !!data.image,
+      });
+
       // Server sends: { clientId, operatorId, operatorName, type, message, image, timestamp }
       // Don't add our own messages again (they're already added optimistically)
-      if (data.operatorId === user?.id) return;
+      if (data.operatorId === userIdRef.current) {
+        logger.log("⏭️  Skipping own message");
+        return;
+      }
 
       // Construct Message object from server data
       const newMsg: Message = data.type === "image"
@@ -519,7 +539,19 @@ export default function OperatorChatPanel() {
             operatorName: data.operatorName,
           };
 
+      logger.log("✏️  Adding message from other operator:", newMsg);
+
       setChats((prev) => {
+        const targetChat = prev.find((c) => c.clientId === data.clientId);
+
+        if (!targetChat) {
+          logger.warn("⚠️  Chat not found for operatorBroadcast:", {
+            lookingFor: data.clientId,
+            availableChats: prev.map(c => ({ id: c.clientId, username: c.username }))
+          });
+          return prev;
+        }
+
         const updatedChats = prev.map((c) => {
           if (c.clientId !== data.clientId) return c;
 
@@ -528,7 +560,12 @@ export default function OperatorChatPanel() {
             (m) => m.timestamp === newMsg.timestamp && m.operatorId === data.operatorId
           );
 
-          if (messageExists) return c;
+          if (messageExists) {
+            logger.log("ℹ️  Message already exists, skipping");
+            return c;
+          }
+
+          logger.log(`✅ Adding broadcast message to chat ${c.username}`);
 
           // Save message from other operator to database asynchronously
           saveMessageToDb(c.username, newMsg, c.clientDbId).then((savedMessageId) => {
@@ -561,12 +598,17 @@ export default function OperatorChatPanel() {
         return updatedChats;
       });
 
-      // Show notification if message is for a different chat
+      // Show notification if message is for a different chat (use updated logic)
       if (activeClientIdRef.current !== data.clientId) {
-        const targetChat = chats.find((c) => c.clientId === data.clientId);
-        notification.info(
-          `${data.operatorName} envió un mensaje a ${targetChat?.username || "un cliente"}`
-        );
+        setChats((prev) => {
+          const targetChat = prev.find((c) => c.clientId === data.clientId);
+          if (targetChat) {
+            notification.info(
+              `${data.operatorName} envió un mensaje a ${targetChat.username}`
+            );
+          }
+          return prev;
+        });
       }
     });
 
