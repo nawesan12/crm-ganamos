@@ -477,35 +477,74 @@ export default function OperatorChatPanel() {
     });
 
     // Listen for messages from other operators
-    s.on("operatorMessageBroadcast", async (data: OperatorMessageBroadcast) => {
+    s.on("operatorBroadcast", async (data: any) => {
+      // Server sends: { clientId, operatorId, operatorName, type, message, image, timestamp }
       // Don't add our own messages again (they're already added optimistically)
       if (data.operatorId === user?.id) return;
+
+      // Construct Message object from server data
+      const newMsg: Message = data.type === "image"
+        ? {
+            from: "operator",
+            image: data.image,
+            name: data.name,
+            mimeType: data.mimeType,
+            timestamp: data.timestamp,
+            operatorId: data.operatorId,
+            operatorName: data.operatorName,
+          }
+        : {
+            from: "operator",
+            text: data.message,
+            timestamp: data.timestamp,
+            operatorId: data.operatorId,
+            operatorName: data.operatorName,
+          };
 
       setChats((prev) => {
         const updatedChats = prev.map((c) => {
           if (c.clientId !== data.clientId) return c;
 
-          // Check if message already exists (by timestamp or id)
+          // Check if message already exists (by timestamp)
           const messageExists = c.messages.some(
-            (m) =>
-              m.timestamp === data.message.timestamp ||
-              (m.id && data.message.id && m.id === data.message.id)
+            (m) => m.timestamp === newMsg.timestamp && m.operatorId === data.operatorId
           );
 
           if (messageExists) return c;
 
           return {
             ...c,
-            messages: [...c.messages, data.message],
+            messages: [...c.messages, newMsg],
           };
         });
 
         return updatedChats;
       });
 
+      // Save message from other operator to database
+      const chat = chats.find((c) => c.clientId === data.clientId);
+      if (chat) {
+        const savedMessageId = await saveMessageToDb(chat.username, newMsg, chat.clientDbId);
+        if (savedMessageId) {
+          setChats((prev) =>
+            prev.map((c) =>
+              c.clientId === data.clientId
+                ? {
+                    ...c,
+                    messages: c.messages.map((m) =>
+                      m.timestamp === newMsg.timestamp && m.operatorId === data.operatorId && !m.id
+                        ? { ...m, id: savedMessageId }
+                        : m
+                    ),
+                  }
+                : c
+            )
+          );
+        }
+      }
+
       // Show notification if message is for a different chat
       if (activeClientIdRef.current !== data.clientId) {
-        const chat = chats.find((c) => c.clientId === data.clientId);
         notification.info(
           `${data.operatorName} envió un mensaje a ${chat?.username || "un cliente"}`
         );
@@ -648,8 +687,12 @@ export default function OperatorChatPanel() {
     );
 
     // Save to database and update with ID
+    logger.log(`💾 Saving message to DB for ${activeChat.username}`);
     const savedMessageId = await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
+    logger.log(`📝 Message saved with ID: ${savedMessageId}`);
+
     if (savedMessageId) {
+      logger.log(`✅ Updating message with ID ${savedMessageId}`);
       setChats((prev) =>
         prev.map((c) =>
           c.clientId === activeChat.clientId
@@ -664,6 +707,8 @@ export default function OperatorChatPanel() {
             : c,
         ),
       );
+    } else {
+      logger.error(`❌ Failed to save message - no ID returned`);
     }
 
     if (operatorTypingTimeoutRef.current) {
@@ -735,8 +780,12 @@ export default function OperatorChatPanel() {
       );
 
       // Save to database and update with ID
+      logger.log(`💾 Saving image message to DB for ${activeChat.username}`);
       const savedMessageId = await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
+      logger.log(`📝 Image message saved with ID: ${savedMessageId}`);
+
       if (savedMessageId) {
+        logger.log(`✅ Updating image message with ID ${savedMessageId}`);
         setChats((prev) =>
           prev.map((c) =>
             c.clientId === activeChat.clientId
@@ -751,6 +800,8 @@ export default function OperatorChatPanel() {
               : c,
           ),
         );
+      } else {
+        logger.error(`❌ Failed to save image message - no ID returned`);
       }
 
       e.target.value = "";
