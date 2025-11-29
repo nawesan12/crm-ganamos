@@ -452,8 +452,10 @@ export default function OperatorChatPanel() {
         return prev.map((c) => {
           if (c.clientId !== data.from) return c;
 
+          const isActiveChatNow = activeClientIdRef.current === data.from;
+
           // Save to database asynchronously (don't await here to avoid blocking UI)
-          saveMessageToDb(c.username, newMsg, c.clientDbId).then((savedMessageId) => {
+          saveMessageToDb(c.username, newMsg, c.clientDbId).then(async (savedMessageId) => {
             if (savedMessageId) {
               // Update with database ID
               setChats((prevChats) =>
@@ -463,13 +465,26 @@ export default function OperatorChatPanel() {
                         ...chat,
                         messages: chat.messages.map((m) =>
                           m.timestamp === newMsg.timestamp && !m.id
-                            ? { ...m, id: savedMessageId }
+                            ? { ...m, id: savedMessageId, isRead: isActiveChatNow }
                             : m
                         ),
                       }
                     : chat
                 )
               );
+
+              // If chat is active, mark as read in DB immediately
+              if (isActiveChatNow && c.clientDbId && userIdRef.current) {
+                try {
+                  await markMessagesAsReadAction({
+                    clientId: c.clientDbId,
+                    operatorId: userIdRef.current,
+                  });
+                  logger.log(`✅ Marked incoming message as read (chat is active)`);
+                } catch (err) {
+                  logger.error("Error marking incoming message as read:", err);
+                }
+              }
             }
           }).catch((err) => {
             logger.error("Error saving incoming message:", err);
@@ -478,8 +493,7 @@ export default function OperatorChatPanel() {
           return {
             ...c,
             messages: [...c.messages, newMsg],
-            unread:
-              activeClientIdRef.current === data.from ? c.unread : c.unread + 1,
+            unread: isActiveChatNow ? c.unread : c.unread + 1,
             isClientTyping: false,
           };
         });
