@@ -148,9 +148,23 @@ export default function OperatorChatPanel() {
       const recentChats = await getRecentChatsAction();
 
       const chatsData: Chat[] = await Promise.all(
-        recentChats.map(async ({ client, unreadCount }) => {
-          // Load full history for each client
-          const history = await getChatHistoryAction({ clientId: client.id, limit: 100 });
+        recentChats.map(async ({ client, unreadCount, isGuest }) => {
+          // Load full history for each client (or guest)
+          let history;
+
+          if (isGuest) {
+            // For guests, use guestUsername to load history
+            history = await getChatHistoryAction({
+              guestUsername: client.username,
+              limit: 100
+            });
+          } else {
+            // For registered clients, use clientId
+            history = await getChatHistoryAction({
+              clientId: client.id,
+              limit: 100
+            });
+          }
 
           const messages: Message[] = history.map((msg: any) => ({
             from: msg.senderType === MessageSenderType.CLIENT ? "client" : "operator",
@@ -171,13 +185,14 @@ export default function OperatorChatPanel() {
             messages,
             unread: unreadCount,
             isClientTyping: false,
-            clientDbId: client.id,
+            clientDbId: isGuest ? undefined : client.id,
             isLoadingHistory: false,
           };
         })
       );
 
       setChats(chatsData);
+      logger.log(`✅ Loaded ${chatsData.length} chats from database`);
     } catch (err) {
       logger.error("Error loading recent chats:", err);
       notification.error("No se pudieron cargar los chats recientes");
@@ -229,19 +244,22 @@ export default function OperatorChatPanel() {
     clientDbId?: number
   ): Promise<number | null> => {
     try {
-      // Get client DB ID if not provided
+      // Determine if we have a registered client or a guest
       let dbClientId = clientDbId;
+      let isGuest = !dbClientId;
+
+      // Try to get client from database if not provided
       if (!dbClientId) {
         const client = await getClientByUsernameAction({ username: clientUsername });
-        if (!client) {
-          logger.warn("Client not found in database:", clientUsername);
-          return null;
+        if (client) {
+          dbClientId = client.id;
+          isGuest = false;
         }
-        dbClientId = client.id;
       }
 
       const savedMessage = await saveChatMessageAction({
-        clientId: dbClientId,
+        clientId: dbClientId ?? null,
+        guestUsername: isGuest ? clientUsername : null,
         clientSocketId: message.from === "client" ? activeClientId ?? null : null,
         senderType: message.from === "client" ? MessageSenderType.CLIENT : MessageSenderType.OPERATOR,
         operatorId: message.from === "operator" ? user?.id ?? null : null,
