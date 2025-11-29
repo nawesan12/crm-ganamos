@@ -332,6 +332,7 @@ export async function getRecentChatsAction() {
     let guestUsernames: Array<{ guestUsername: string | null; _max: { guestPhone: string | null } }> = [];
 
     try {
+      // @ts-expect-error - Prisma groupBy type inference issue with TypeScript 5.x
       guestUsernames = await prisma.chatMessage.groupBy({
         by: ['guestUsername'],
         where: {
@@ -350,96 +351,96 @@ export async function getRecentChatsAction() {
       // Continue without guests
     }
 
-  // For each client, get their last message and unread count
-  const clientChats = await Promise.all(
-    clients.map(async (client) => {
-      const lastMessage = await prisma.chatMessage.findFirst({
-        where: { clientId: client.id },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          text: true,
-          imageUrl: true,
-          messageType: true,
-          senderType: true,
-          createdAt: true,
-        },
-      });
+    // For each client, get their last message and unread count
+    const clientChats = await Promise.all(
+      clients.map(async (client) => {
+        const lastMessage = await prisma.chatMessage.findFirst({
+          where: { clientId: client.id },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            text: true,
+            imageUrl: true,
+            messageType: true,
+            senderType: true,
+            createdAt: true,
+          },
+        });
 
-      const unreadCount = await prisma.chatMessage.count({
-        where: {
-          clientId: client.id,
-          senderType: MessageSenderType.CLIENT,
-          isRead: false,
-        },
-      });
+        const unreadCount = await prisma.chatMessage.count({
+          where: {
+            clientId: client.id,
+            senderType: MessageSenderType.CLIENT,
+            isRead: false,
+          },
+        });
 
-      return {
-        client,
-        lastMessage,
-        unreadCount,
-        isGuest: false,
-      };
-    })
-  );
+        return {
+          client,
+          lastMessage,
+          unreadCount,
+          isGuest: false,
+        };
+      })
+    );
 
-  // For each guest username, check if they haven't been converted to a client yet
-  const guestChats = await Promise.all(
-    guestUsernames.map(async (guest) => {
-      if (!guest.guestUsername) return null;
+    // For each guest username, check if they haven't been converted to a client yet
+    const guestChats = await Promise.all(
+      guestUsernames.map(async (guest) => {
+        if (!guest.guestUsername) return null;
 
-      // Check if this guest was already converted to a client
-      const convertedClient = clients.find(c => c.username === guest.guestUsername);
-      if (convertedClient) {
-        // Skip - this guest is now a proper client and already included above
-        return null;
-      }
+        // Check if this guest was already converted to a client
+        const convertedClient = clients.find(c => c.username === guest.guestUsername);
+        if (convertedClient) {
+          // Skip - this guest is now a proper client and already included above
+          return null;
+        }
 
-      const lastMessage = await prisma.chatMessage.findFirst({
-        where: { guestUsername: guest.guestUsername, clientId: null },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          text: true,
-          imageUrl: true,
-          messageType: true,
-          senderType: true,
-          createdAt: true,
-        },
-      });
+        const lastMessage = await prisma.chatMessage.findFirst({
+          where: { guestUsername: guest.guestUsername, clientId: null },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            text: true,
+            imageUrl: true,
+            messageType: true,
+            senderType: true,
+            createdAt: true,
+          },
+        });
 
-      const unreadCount = await prisma.chatMessage.count({
-        where: {
-          guestUsername: guest.guestUsername,
-          clientId: null,
-          senderType: MessageSenderType.CLIENT,
-          isRead: false,
-        },
-      });
+        const unreadCount = await prisma.chatMessage.count({
+          where: {
+            guestUsername: guest.guestUsername,
+            clientId: null,
+            senderType: MessageSenderType.CLIENT,
+            isRead: false,
+          },
+        });
 
-      return {
-        client: {
-          id: 0, // Temporary ID for guests
-          username: guest.guestUsername,
-          phone: guest._max.guestPhone ?? null,
-          status: 'ACTIVE' as const,
-        },
-        lastMessage,
-        unreadCount,
-        isGuest: true,
-      };
-    })
-  );
+        return {
+          client: {
+            id: 0, // Temporary ID for guests
+            username: guest.guestUsername,
+            phone: guest._max.guestPhone ?? null,
+            status: 'ACTIVE' as const,
+          },
+          lastMessage,
+          unreadCount,
+          isGuest: true,
+        };
+      })
+    );
 
-  // Combine and filter out nulls
-  const allChats = [...clientChats, ...guestChats.filter((chat): chat is NonNullable<typeof chat> => chat !== null)];
+    // Combine and filter out nulls
+    const allChats = [...clientChats, ...guestChats.filter((chat): chat is NonNullable<typeof chat> => chat !== null)];
 
-  // Sort by last message time
-  return allChats.sort((a, b) => {
-    const aTime = a.lastMessage?.createdAt?.getTime() ?? 0;
-    const bTime = b.lastMessage?.createdAt?.getTime() ?? 0;
-    return bTime - aTime;
-  });
+    // Sort by last message time
+    return allChats.sort((a, b) => {
+      const aTime = a.lastMessage?.createdAt?.getTime() ?? 0;
+      const bTime = b.lastMessage?.createdAt?.getTime() ?? 0;
+      return bTime - aTime;
+    });
   } catch (error: any) {
     console.error("❌ Error in getRecentChatsAction:", error);
     console.error("Error details:", {
