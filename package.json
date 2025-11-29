@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma generate && next build",
+    "build": "prisma generate && prisma migrate deploy && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
-    "migrate:deploy": "npx prisma migrate deploy",
-    "migrate:status": "npx prisma migrate status",
-    "db:generate": "npx prisma generate"
+    "postinstall": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "6.0.1",
