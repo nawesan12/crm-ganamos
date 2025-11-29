@@ -288,7 +288,7 @@ function CrmWorkspaceContent() {
           <h1 className="text-3xl font-semibold tracking-tight">Panel CRM</h1>
           <p className="text-sm text-muted-foreground mt-1">Gestión de relaciones con clientes</p>
         </div>
-        <Link href="/crm/chat">
+        <Link href="/operator-chat">
           <Button variant="outline" className="gap-2">
             <MessageCircle className="size-4" />
             Chat
