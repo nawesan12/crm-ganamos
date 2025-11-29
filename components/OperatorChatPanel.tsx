@@ -28,6 +28,8 @@ interface Message {
   timestamp?: string;
   id?: number; // Database ID
   isRead?: boolean;
+  operatorId?: number; // ID of operator who sent the message
+  operatorName?: string; // Name of operator who sent the message
 }
 
 interface Chat {
@@ -58,6 +60,13 @@ interface IncomingMessagePayload {
 interface TypingPayload {
   from: string; // clientId (del lado del operador)
   isTyping: boolean;
+}
+
+interface OperatorMessageBroadcast {
+  clientId: string; // The client this message was sent to
+  message: Message; // The message that was sent
+  operatorId: number; // ID of the operator who sent it
+  operatorName: string; // Name of the operator who sent it
 }
 
 // ---------------- COMPONENT ----------------
@@ -118,6 +127,8 @@ export default function OperatorChatPanel() {
         timestamp: msg.createdAt.toISOString(),
         id: msg.id,
         isRead: msg.isRead,
+        operatorId: msg.operatorId ?? undefined,
+        operatorName: msg.operator?.name ?? undefined,
       }));
 
       setChats((prev) =>
@@ -190,7 +201,11 @@ export default function OperatorChatPanel() {
       console.log("✅ Conectado como operador");
       setConnectionStatus("connected");
       toast.success("Conectado al servidor de chat");
-      s.emit("join", { role: "operator", name: "Operador 1" });
+      s.emit("join", {
+        role: "operator",
+        name: user?.name || "Operador",
+        operatorId: user?.id
+      });
     });
 
     s.on("disconnect", () => {
@@ -309,6 +324,42 @@ export default function OperatorChatPanel() {
       if (activeClientIdRef.current === clientId) setActiveClientId(null);
     });
 
+    // Listen for messages from other operators
+    s.on("operatorMessageBroadcast", async (data: OperatorMessageBroadcast) => {
+      // Don't add our own messages again (they're already added optimistically)
+      if (data.operatorId === user?.id) return;
+
+      setChats((prev) => {
+        const updatedChats = prev.map((c) => {
+          if (c.clientId !== data.clientId) return c;
+
+          // Check if message already exists (by timestamp or id)
+          const messageExists = c.messages.some(
+            (m) =>
+              m.timestamp === data.message.timestamp ||
+              (m.id && data.message.id && m.id === data.message.id)
+          );
+
+          if (messageExists) return c;
+
+          return {
+            ...c,
+            messages: [...c.messages, data.message],
+          };
+        });
+
+        return updatedChats;
+      });
+
+      // Show notification if message is for a different chat
+      if (activeClientIdRef.current !== data.clientId) {
+        const chat = chats.find((c) => c.clientId === data.clientId);
+        toast.info(
+          `${data.operatorName} envió un mensaje a ${chat?.username || "un cliente"}`
+        );
+      }
+    });
+
     return () => {
       s.removeAllListeners();
       s.disconnect();
@@ -414,18 +465,22 @@ export default function OperatorChatPanel() {
   // 🆕 Enviar mensaje de TEXTO
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !activeChat || !socketRef.current) return;
+    if (!input.trim() || !activeChat || !socketRef.current || !user) return;
 
     const newMsg: Message = {
       from: "operator",
       text: input,
       timestamp: new Date().toISOString(),
+      operatorId: user.id,
+      operatorName: user.name,
     };
 
     socketRef.current.emit("operatorMessage", {
       to: activeChat.clientId,
       type: "text",
       message: input,
+      operatorId: user.id,
+      operatorName: user.name,
     });
 
     setChats((prev) =>
@@ -474,12 +529,16 @@ export default function OperatorChatPanel() {
     reader.onload = async () => {
       const base64 = reader.result as string;
 
+      if (!user) return;
+
       const newMsg: Message = {
         from: "operator",
         image: base64,
         mimeType: file.type,
         name: file.name,
         timestamp: new Date().toISOString(),
+        operatorId: user.id,
+        operatorName: user.name,
       };
 
       // Emitir al servidor
@@ -490,6 +549,8 @@ export default function OperatorChatPanel() {
         name: file.name,
         mimeType: file.type,
         size: file.size,
+        operatorId: user.id,
+        operatorName: user.name,
       });
 
       // Agregar al chat local
@@ -722,6 +783,7 @@ export default function OperatorChatPanel() {
 
               {activeChat.messages.map((m, i) => {
                 const isOperator = m.from === "operator";
+                const isCurrentUser = m.operatorId === user?.id;
 
                 return (
                   <div
@@ -730,6 +792,12 @@ export default function OperatorChatPanel() {
                       isOperator ? "ml-auto" : "mr-auto"
                     }`}
                   >
+                    {/* Show operator name for messages from other operators */}
+                    {isOperator && !isCurrentUser && m.operatorName && (
+                      <div className="text-xs text-neutral-500 mb-1 ml-2 font-medium">
+                        {m.operatorName}
+                      </div>
+                    )}
                     <div
                       className={`p-4 rounded-2xl break-words text-sm ${
                         isOperator
