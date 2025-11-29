@@ -907,6 +907,21 @@ export default function OperatorChatPanel() {
                 ? c.username.toLowerCase().includes(searchQuery.toLowerCase())
                 : true
             )
+            .sort((a, b) => {
+              // Get the timestamp of the last message for each chat
+              const aLastMessage = a.messages[a.messages.length - 1];
+              const bLastMessage = b.messages[b.messages.length - 1];
+
+              // If no messages, put at the bottom
+              if (!aLastMessage && !bLastMessage) return 0;
+              if (!aLastMessage) return 1;
+              if (!bLastMessage) return -1;
+
+              // Sort by timestamp descending (most recent first)
+              const aTime = new Date(aLastMessage.timestamp || 0).getTime();
+              const bTime = new Date(bLastMessage.timestamp || 0).getTime();
+              return bTime - aTime;
+            })
             .map((c) => {
               const isActive = activeClientId === c.clientId;
               const lastMessage =
