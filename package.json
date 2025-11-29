@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "npx prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:deploy": "npx prisma migrate deploy",
+    "migrate:status": "npx prisma migrate status",
+    "db:generate": "npx prisma generate"
   },
   "dependencies": {
     "@prisma/client": "6.0.1",
