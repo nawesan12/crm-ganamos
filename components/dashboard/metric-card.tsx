@@ -1,3 +1,5 @@
+"use client";
+
 import { ReactNode } from "react";
 
 import {
@@ -8,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { MiniAreaChart } from "./mini-area-chart";
 
 type MetricCardProps = {
   title: string;
@@ -18,6 +21,8 @@ type MetricCardProps = {
   trendValue?: string;
   trendDirection?: "up" | "down" | "neutral";
   className?: string;
+  sparklineData?: Array<{ value: number }>;
+  sparklineColor?: string;
 };
 
 export function MetricCard({
@@ -29,6 +34,8 @@ export function MetricCard({
   trendValue,
   trendDirection = "neutral",
   className,
+  sparklineData,
+  sparklineColor,
 }: MetricCardProps) {
   const trendColor =
     trendDirection === "up"
@@ -61,6 +68,11 @@ export function MetricCard({
         )}
         {description && (
           <p className="text-sm text-muted-foreground">{description}</p>
+        )}
+        {sparklineData && sparklineData.length > 0 && (
+          <div className="mt-2 -mb-2">
+            <MiniAreaChart data={sparklineData} color={sparklineColor} height={50} />
+          </div>
         )}
       </CardContent>
     </Card>

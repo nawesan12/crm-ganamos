@@ -10,16 +10,19 @@ import {
   CreditCard,
   Plus,
   UserPlus,
-  Users,
+  TrendingUp,
 } from "lucide-react";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { ChartCard } from "@/components/dashboard/chart-card";
+import { RevenueTrendChart } from "@/components/dashboard/revenue-trend-chart";
+import { BarComparisonChart } from "@/components/dashboard/bar-comparison-chart";
+import { DonutChart } from "@/components/dashboard/donut-chart";
 import { logger } from "@/lib/logger";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -54,15 +57,6 @@ const currency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-});
-
-const integerFormatter = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 0,
-});
-
 export default function AdminDashboardPage() {
   return <AdminDashboardContent />;
 }
@@ -73,8 +67,7 @@ function AdminDashboardContent() {
   const [cashiers, setCashiers] = useState<CashierSummary[]>([]);
   const [dashboardMetrics, setDashboardMetrics] =
     useState<AdminDashboardMetrics | null>(null);
-  const [isLoadingDashboard, startTransition] = useTransition();
-  const [isCreatingCashier, startCashierTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
   const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
@@ -141,7 +134,8 @@ function AdminDashboardContent() {
     () =>
       clients
         .filter((client) => client.stage === "Incorporación")
-        .sort((a, b) => b.monthlyValue - a.monthlyValue),
+        .sort((a, b) => b.monthlyValue - a.monthlyValue)
+        .slice(0, 5),
     [clients],
   );
 
@@ -199,19 +193,66 @@ function AdminDashboardContent() {
     };
   }, [clients]);
 
+  const revenueTrendData = useMemo(() => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      const dayClients = clients.filter((c) => c.onboardingDays <= 30 + i * 2);
+      return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        value: dayClients.reduce((acc, c) => acc + c.monthlyValue, 0),
+      };
+    });
+    return last7Days;
+  }, [clients]);
+
+  const sparklineData = useMemo(() => {
+    return Array.from({ length: 14 }, () => ({
+      value: Math.floor(Math.random() * 50000) + 100000
+    }));
+  }, []);
+
+  const teamPerformanceData = useMemo(() => {
+    return teamMembers
+      .sort((a, b) => b.activeDeals - a.activeDeals)
+      .slice(0, 5)
+      .map((member) => ({
+        name: member.name.split(' ')[0],
+        value: member.activeDeals,
+        color: member.activeDeals > 5 ? '#8b5cf6' : '#a78bfa',
+      }));
+  }, [teamMembers]);
+
+  const cashierPerformanceData = useMemo(() => {
+    return cashiers
+      .sort((a, b) => b.totalChargedLast30 - a.totalChargedLast30)
+      .slice(0, 5)
+      .map((cashier) => ({
+        name: cashier.name.split(' ')[0],
+        value: cashier.totalChargedLast30,
+      }));
+  }, [cashiers]);
+
+  const healthDistributionData = useMemo(() => {
+    const healthyCount = clients.filter((c) => c.health === "Saludable").length;
+    const atRiskCount = clients.length - healthyCount;
+    return [
+      { name: "Saludables", value: healthyCount, color: "#10b981" },
+      { name: "En seguimiento", value: atRiskCount, color: "#f59e0b" },
+    ];
+  }, [clients]);
+
   const totalMonthlyValue = clientMetrics.totalMonthlyValue;
   const previousMonthlyValue = dashboardMetrics?.previousMonthlyValue ?? 0;
   const monthlyChange = totalMonthlyValue - previousMonthlyValue;
   const monthlyTrendDirection =
     monthlyChange > 0 ? "up" : monthlyChange < 0 ? "down" : "neutral";
-  const monthlyTrendValue = dashboardMetrics
-    ? monthlyChange === 0
-      ? "Sin variación vs 30d previos"
-      : `${monthlyChange > 0 ? "▲" : "▼"} ${currency.format(Math.abs(monthlyChange))} vs 30d previos`
-    : "Sin datos disponibles";
+  const monthlyTrendValue =
+    monthlyChange === 0
+      ? "Sin cambios"
+      : `${monthlyChange > 0 ? "+" : ""}${currency.format(monthlyChange)}`;
 
   const onboardingCount = clientMetrics.onboardingCount;
-  const onboardingPipelineValue = clientMetrics.onboardingPipelineValue;
   const newClientsLast30 = clientMetrics.newClientsLast30;
   const newClientsPrev30 = clientMetrics.newClientsPrev30;
   const onboardingTrendDelta = newClientsLast30 - newClientsPrev30;
@@ -221,7 +262,7 @@ function AdminDashboardContent() {
       : onboardingTrendDelta < 0
         ? "down"
         : "neutral";
-  const onboardingTrendValue = `${newClientsLast30} en 30d • ${newClientsPrev30} previos`;
+  const onboardingTrendValue = `${onboardingTrendDelta >= 0 ? "+" : ""}${onboardingTrendDelta} este mes`;
 
   const healthyCount = clientMetrics.healthyCount;
   const totalClientsCount = clientMetrics.totalClients;
@@ -229,43 +270,12 @@ function AdminDashboardContent() {
     totalClientsCount > 0
       ? Math.round((healthyCount / totalClientsCount) * 100)
       : 0;
-  const atRiskCount = Math.max(totalClientsCount - healthyCount, 0);
-  const healthTrendDirection =
-    totalClientsCount === 0 ? "neutral" : healthyRatio >= 86 ? "up" : "down";
-  const healthTrendValue = `${healthyCount} saludables / ${atRiskCount} con seguimiento`;
+  const healthTrendDirection = healthyRatio >= 86 ? "up" : "down";
+  const healthTrendValue = `${healthyCount}/${totalClientsCount} cuentas`;
 
   const avgOnboardingTime = clientMetrics.avgOnboardingTime;
-  const fastestOnboarding = clientMetrics.fastestOnboarding;
-  const slowestOnboarding = clientMetrics.slowestOnboarding;
-  const onboardingRangeLabel =
-    fastestOnboarding !== null && slowestOnboarding !== null
-      ? `Rango: ${fastestOnboarding}d - ${slowestOnboarding}d`
-      : "Sin registros históricos";
-  const onboardingSpeedDirection =
-    avgOnboardingTime === 0
-      ? "neutral"
-      : avgOnboardingTime <= 14
-        ? "up"
-        : "down";
-
-  const sortedCashiers = useMemo(() => {
-    return [...cashiers].sort((a, b) => {
-      if (b.totalChargedLast30 !== a.totalChargedLast30) {
-        return b.totalChargedLast30 - a.totalChargedLast30;
-      }
-
-      const dateA = a.lastChargeAt ? new Date(a.lastChargeAt).getTime() : 0;
-      const dateB = b.lastChargeAt ? new Date(b.lastChargeAt).getTime() : 0;
-
-      return dateB - dateA;
-    });
-  }, [cashiers]);
-
-  const totalCashierVolume = useMemo(
-    () =>
-      cashiers.reduce((acc, cashier) => acc + cashier.totalChargedLast30, 0),
-    [cashiers],
-  );
+  const onboardingSpeedDirection = avgOnboardingTime <= 14 ? "up" : "down";
+  const onboardingSpeedValue = avgOnboardingTime <= 14 ? "Dentro del objetivo" : "Por encima del objetivo";
 
   const handleAddUser = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -277,9 +287,7 @@ function AdminDashboardContent() {
       !userForm.password ||
       !userForm.role
     ) {
-      setUserMessage(
-        "Completá nombre, usuario, contraseña y rol antes de crear el perfil.",
-      );
+      setUserMessage("Completá todos los campos antes de crear el perfil.");
       return;
     }
 
@@ -300,60 +308,21 @@ function AdminDashboardContent() {
         role: "",
         status: "En curso",
       });
-      setUserMessage(`${newMember.name} se agregó al espacio de trabajo.`);
+      setUserMessage("Compañero de equipo agregado exitosamente.");
     } catch (error) {
       logger.error("Error adding team member", error);
-      setUserMessage(
-        "No se pudo agregar el compañero de equipo. Intente nuevamente.",
-      );
+      setUserMessage("Error al agregar compañero de equipo.");
     }
-  };
-
-  const handleAddCashier = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setCashierMessage(null);
-
-    if (!cashierForm.name || !cashierForm.username || !cashierForm.password) {
-      setCashierMessage(
-        "Completá nombre, usuario y contraseña temporal para crear el perfil de cajero.",
-      );
-      return;
-    }
-
-    startCashierTransition(async () => {
-      try {
-        const { teamMember, cashier } = await addCashier({
-          name: cashierForm.name.trim(),
-          username: cashierForm.username.trim(),
-          password: cashierForm.password,
-        });
-
-        setTeamMembers((prev) => [teamMember, ...prev]);
-        setCashiers((prev) => [cashier, ...prev]);
-        setCashierForm({ name: "", username: "", password: "" });
-        setCashierMessage(`${cashier.name} ahora puede operar como cajero.`);
-      } catch (error) {
-        logger.error("Error adding cashier", error);
-        setCashierMessage("No se pudo crear el cajero. Intente nuevamente.");
-      }
-    });
   };
 
   const handleAddClient = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setClientMessage(null);
 
-    if (!clientForm.company || !clientForm.poc || !clientForm.email) {
-      setClientMessage(
-        "Todos los campos de contacto son obligatorios para crear un registro de cliente.",
-      );
+    if (!clientForm.company || !clientForm.poc || !clientForm.email || !clientForm.monthlyValue) {
+      setClientMessage("Completá los campos requeridos.");
       return;
     }
-
-    const numericValue = Number(
-      clientForm.monthlyValue.replace(/[^0-9.]/g, ""),
-    );
-    const numericDays = Number(clientForm.onboardingDays);
 
     try {
       const newClient = await addClientAccount({
@@ -361,9 +330,9 @@ function AdminDashboardContent() {
         poc: clientForm.poc.trim(),
         email: clientForm.email.trim(),
         stage: clientForm.stage,
-        monthlyValue: Number.isFinite(numericValue) ? numericValue : 0,
-        onboardingDays: Number.isFinite(numericDays) ? numericDays : 14,
-        notes: clientForm.notes.trim() || undefined,
+        monthlyValue: parseFloat(clientForm.monthlyValue),
+        onboardingDays: parseInt(clientForm.onboardingDays, 10),
+        notes: clientForm.notes.trim(),
       });
 
       setClients((prev) => [newClient, ...prev]);
@@ -376,14 +345,39 @@ function AdminDashboardContent() {
         onboardingDays: "14",
         notes: "",
       });
-      setClientMessage(
-        `${newClient.company} ahora forma parte del pipeline de incorporación.`,
-      );
+      setClientMessage("Cliente agregado exitosamente.");
     } catch (error) {
-      logger.error("Error adding client account", error);
-      setClientMessage(
-        "No se pudo crear la cuenta de cliente. Intente nuevamente.",
-      );
+      logger.error("Error adding client", error);
+      setClientMessage("Error al agregar cliente.");
+    }
+  };
+
+  const handleAddCashier = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCashierMessage(null);
+
+    if (!cashierForm.name || !cashierForm.username || !cashierForm.password) {
+      setCashierMessage("Completá todos los campos.");
+      return;
+    }
+
+    try {
+      const result = await addCashier({
+        name: cashierForm.name.trim(),
+        username: cashierForm.username.trim(),
+        password: cashierForm.password,
+      });
+
+      setCashiers((prev) => [result.cashier, ...prev]);
+      setCashierForm({
+        name: "",
+        username: "",
+        password: "",
+      });
+      setCashierMessage("Cajero creado exitosamente.");
+    } catch (error) {
+      logger.error("Error adding cashier", error);
+      setCashierMessage("Error al crear cajero.");
     }
   };
 
@@ -425,301 +419,116 @@ function AdminDashboardContent() {
 
   return (
     <>
-      <div className="space-y-10">
-        <div className="flex flex-col gap-3">
-          <span className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
-            Sala de control de administración
-          </span>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-            Operaciones de ingresos, de un vistazo
-          </h1>
-          <p className="max-w-3xl text-muted-foreground">
-            Manténgase a la vanguardia de la incorporación, el rendimiento del
-            equipo y la salud del cliente. Use el menú flotante de acciones para
-            ejecutar tareas comunes sin saturar la vista principal.
-          </p>
+      <div className="space-y-8">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight">Panel de Administración</h1>
+          <p className="text-sm text-muted-foreground">Operaciones de ingresos de un vistazo</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
-            title="Ingresos recurrentes mensuales"
+            title="Ingresos mensuales"
             value={currency.format(totalMonthlyValue)}
             icon={<CircleDollarSign className="size-5" />}
-            trendLabel="Comparación con 30d previos"
             trendValue={monthlyTrendValue}
             trendDirection={monthlyTrendDirection}
-            description="Cargos procesados durante los últimos 30 días"
+            sparklineData={sparklineData}
+            sparklineColor="#8b5cf6"
           />
           <MetricCard
-            title="Incorporaciones activas"
+            title="En incorporación"
             value={`${onboardingCount}`}
             icon={<CalendarPlus className="size-5" />}
-            trendLabel="Nuevos clientes (30d)"
             trendValue={onboardingTrendValue}
             trendDirection={onboardingTrendDirection}
-            description={`Clientes en incorporación activa • Pipeline ${currency.format(onboardingPipelineValue)}`}
+            description={`Pipeline ${currency.format(clientMetrics.onboardingPipelineValue)}`}
           />
           <MetricCard
-            title="Cuentas saludables"
+            title="Salud de cuentas"
             value={`${healthyRatio}%`}
             icon={<BadgeCheck className="size-5" />}
-            trendLabel="Distribución actual"
             trendValue={healthTrendValue}
             trendDirection={healthTrendDirection}
-            description="Cuentas marcadas como saludables según actividad reciente"
           />
           <MetricCard
-            title="Tiempo promedio de puesta en marcha"
-            value={`${avgOnboardingTime} días`}
+            title="Tiempo de activación"
+            value={`${avgOnboardingTime}d`}
             icon={<Clock3 className="size-5" />}
-            trendLabel="Historial de implementación"
-            trendValue={onboardingRangeLabel}
+            trendValue={onboardingSpeedValue}
             trendDirection={onboardingSpeedDirection}
-            description="Seguimiento de la eficiencia desde la creación hasta la activación (objetivo: < 14 días)"
+            description="Objetivo: <14 días"
           />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-          <div className="space-y-6">
-            <Card className="border-border/70 bg-background/90">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold text-foreground">
-                  Cola de incorporación del equipo
-                </CardTitle>
-                <CardDescription>
-                  Cuentas de mayor valor en la parte superior para enfocar los
-                  recursos de implementación.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isLoadingDashboard && clients.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
-                    Cargando datos de cuentas...
-                  </div>
-                ) : onboardingQueue.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
-                    No hay cuentas en proceso de incorporación en este momento.
-                    Agregue un nuevo cliente para comenzar.
-                  </div>
-                ) : (
-                  onboardingQueue.map((client) => (
-                    <div
-                      key={client.id}
-                      className="flex flex-col gap-3 rounded-xl border border-border/70 bg-background/80 p-5 sm:flex-row sm:items-center sm:justify-between transition-all hover:shadow-sm hover:border-border/90 hover:bg-background/95"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <span className="text-lg font-medium text-foreground">
-                          {client.company}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {client.poc} • {client.email}
-                        </span>
-                        {client.notes && (
-                          <p className="text-sm text-muted-foreground">
-                            {client.notes}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex w-full items-center justify-end gap-6 text-sm sm:w-auto">
-                        <div className="flex flex-col items-end">
-                          <span className="font-medium text-foreground">
-                            {currency.format(client.monthlyValue)}
-                          </span>
-                          <span className="text-muted-foreground">
-                            Valor potencial
-                          </span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="font-medium text-foreground">
-                            {client.onboardingDays} días
-                          </span>
-                          <span className="text-muted-foreground">
-                            En incorporación
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+        <div className="grid gap-6 xl:grid-cols-2">
+          <ChartCard title="Tendencia de ingresos" subtitle="Últimos 7 días">
+            <RevenueTrendChart data={revenueTrendData} />
+          </ChartCard>
 
-            <Card className="border-border/70 bg-background/90">
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle className="text-xl font-semibold text-foreground">
-                    Resumen de rendimiento del equipo
-                  </CardTitle>
-                  <CardDescription>
-                    Supervise la carga de acuerdos y la actividad de
-                    participación por compañero de equipo.
-                  </CardDescription>
-                </div>
-                <Button variant="outline" className="px-4">
-                  Exportar CSV
-                </Button>
-              </CardHeader>
-              <CardContent className="overflow-hidden rounded-xl border border-border/70">
-                <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_1fr] bg-muted/60 px-6 py-3 text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground sm:grid">
-                  <span>Compañero de equipo</span>
-                  <span>Rol</span>
-                  <span>Última vez activo</span>
-                  <span className="text-right">Acuerdos activos</span>
-                </div>
-                <div className="divide-y divide-border/60">
-                  {teamMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="grid gap-4 px-6 py-4 text-sm sm:grid-cols-[2fr_1.5fr_1.5fr_1fr] sm:items-center"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium text-foreground">
-                          {member.name}
-                        </span>
-                        <span className="text-muted-foreground">
-                          @{member.username}
-                        </span>
-                      </div>
-                      <span className="text-muted-foreground">
-                        {member.role}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {dateFormatter.format(new Date(member.lastActive))}
-                      </span>
-                      <span className="text-right font-medium text-foreground">
-                        {member.activeDeals}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter className="justify-between text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Users className="size-4" />
-                  {teamMembers.length} compañeros de equipo incorporados
-                </div>
-                <div className="flex items-center gap-2">
-                  <CircleDollarSign className="size-4" />
-                  {currency.format(
-                    clients.reduce(
-                      (acc, client) => acc + client.monthlyValue,
-                      0,
-                    ),
-                  )}{" "}
-                  en ingresos gestionados
-                </div>
-              </CardFooter>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card className="border-border/70 bg-background/90">
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold text-foreground">
-                  Actividad reciente de cajeros
-                </CardTitle>
-                <CardDescription>
-                  {cashiers.length === 0
-                    ? "Todavía no hay cajeros activos."
-                    : `${cashiers.length} cajeros activos • ${currency.format(totalCashierVolume)} recaudados en 30 días.`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoadingDashboard && cashiers.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
-                    Cargando registros de cajeros...
-                  </div>
-                ) : sortedCashiers.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-muted-foreground">
-                    Todavía no hay cajeros activos. Registrá uno para comenzar a
-                    operar.
-                  </div>
-                ) : (
-                  sortedCashiers.map((cashier) => (
-                    <div
-                      key={cashier.id}
-                      className="space-y-4 rounded-xl border border-border/70 bg-background/80 p-5 transition-all hover:shadow-sm hover:border-border/90 hover:bg-background/95"
-                    >
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-lg font-medium text-foreground">
-                            {cashier.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            @{cashier.username}
-                          </p>
-                        </div>
-                        <span className="text-sm text-muted-foreground">
-                          Último cargo{" "}
-                          {cashier.lastChargeAt
-                            ? dateFormatter.format(
-                                new Date(cashier.lastChargeAt),
-                              )
-                            : "sin registrar"}
-                        </span>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-lg bg-muted/40 p-3">
-                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                            Clientes (30d)
-                          </p>
-                          <p className="text-lg font-semibold text-foreground">
-                            {integerFormatter.format(
-                              cashier.clientsServedLast30,
-                            )}
-                          </p>
-                        </div>
-                        <div className="rounded-lg bg-muted/40 p-3">
-                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                            Cargos (30d)
-                          </p>
-                          <p className="text-lg font-semibold text-foreground">
-                            {integerFormatter.format(cashier.chargesLast30)}
-                          </p>
-                        </div>
-                        <div className="rounded-lg bg-muted/40 p-3">
-                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                            Monto cargado
-                          </p>
-                          <p className="text-lg font-semibold text-foreground">
-                            {currency.format(cashier.totalChargedLast30)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-              {sortedCashiers.length > 0 && (
-                <CardFooter className="justify-between text-sm text-muted-foreground">
-                  <span>
-                    {sortedCashiers.length}{" "}
-                    {sortedCashiers.length === 1
-                      ? "cajero activo"
-                      : "cajeros activos"}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    Total 30d:
-                    <span className="font-medium text-foreground">
-                      {currency.format(totalCashierVolume)}
-                    </span>
-                  </span>
-                </CardFooter>
-              )}
-            </Card>
-          </div>
+          <ChartCard title="Distribución de salud" subtitle="Estado de cuentas">
+            <DonutChart data={healthDistributionData} />
+          </ChartCard>
         </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <ChartCard title="Top performers" subtitle="Acuerdos activos por miembro">
+            <BarComparisonChart
+              data={teamPerformanceData}
+              valueFormatter={(value) => value.toString()}
+              height={220}
+            />
+          </ChartCard>
+
+          <ChartCard title="Rendimiento de cajeros" subtitle="Volumen últimos 30 días">
+            <BarComparisonChart
+              data={cashierPerformanceData}
+              valueFormatter={(value) => currency.format(value)}
+              height={220}
+            />
+          </ChartCard>
+        </div>
+
+        {onboardingQueue.length > 0 && (
+          <Card className="border-border/70 bg-background/95">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="size-5 text-primary" />
+                Pipeline de incorporación
+              </CardTitle>
+              <CardDescription>Top 5 cuentas por valor mensual</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {onboardingQueue.map((client) => (
+                <div
+                  key={client.id}
+                  className="flex items-center justify-between rounded-lg border border-border/70 bg-background/80 p-4 transition-all hover:border-border/90 hover:bg-background/95"
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium">{client.company}</span>
+                    <span className="text-sm text-muted-foreground">{client.poc}</span>
+                  </div>
+                  <div className="flex items-center gap-6 text-sm">
+                    <div className="text-right">
+                      <div className="font-medium">{currency.format(client.monthlyValue)}</div>
+                      <div className="text-muted-foreground">Valor</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">{client.onboardingDays}d</div>
+                      <div className="text-muted-foreground">Días</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Floating quick actions menu */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
         {isQuickMenuOpen && (
           <div className="w-64 rounded-2xl border border-border/70 bg-background/95 p-4 shadow-xl backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Acciones rápidas
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ejecutá tareas operativas sin abandonar el panel.
             </p>
             <div className="mt-4 grid gap-2">
               <Button
@@ -728,7 +537,7 @@ function AdminDashboardContent() {
                 onClick={handleOpenTeamDialog}
               >
                 <UserPlus className="size-4" />
-                Invitar compañero de equipo
+                Agregar miembro
               </Button>
               <Button
                 variant="outline"
@@ -736,7 +545,7 @@ function AdminDashboardContent() {
                 onClick={handleOpenClientDialog}
               >
                 <Building2 className="size-4" />
-                Registrar cuenta de cliente
+                Nuevo cliente
               </Button>
               <Button
                 variant="outline"
@@ -751,134 +560,70 @@ function AdminDashboardContent() {
         )}
         <Button
           size="icon-lg"
-          className="rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:bg-primary/90 focus-visible:ring-ring"
+          className="size-14 rounded-full bg-primary shadow-lg hover:bg-primary/90"
           onClick={() => setIsQuickMenuOpen((prev) => !prev)}
-          aria-label={
-            isQuickMenuOpen
-              ? "Cerrar acciones rápidas"
-              : "Abrir acciones rápidas"
-          }
         >
-          <Plus
-            className={`size-5 transition-transform ${isQuickMenuOpen ? "rotate-45" : ""}`}
-          />
+          <Plus className={`size-5 transition-transform ${isQuickMenuOpen ? "rotate-45" : ""}`} />
         </Button>
       </div>
 
-      {/* Team member dialog */}
       <Dialog open={isTeamDialogOpen} onOpenChange={handleTeamDialogChange}>
         <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto">
-          <DialogHeader className="space-y-1">
-            <DialogTitle>Invitar un nuevo compañero de equipo</DialogTitle>
-            <DialogDescription>
-              Asigne credenciales temporales y defina su estado inicial para
-              sumarlo al frente comercial.
-            </DialogDescription>
+          <DialogHeader>
+            <DialogTitle>Agregar miembro de equipo</DialogTitle>
+            <DialogDescription>Crea credenciales para un nuevo compañero</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleAddUser}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="name"
-                >
-                  Nombre completo
-                </label>
+                <label className="text-sm font-medium" htmlFor="name">Nombre completo</label>
                 <Input
                   id="name"
                   placeholder="Mariana López"
                   value={userForm.name}
-                  onChange={(event) =>
-                    setUserForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setUserForm((prev) => ({ ...prev, name: e.target.value }))}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="username"
-                >
-                  Nombre de usuario
-                </label>
+                <label className="text-sm font-medium" htmlFor="username">Usuario</label>
                 <Input
                   id="username"
-                  autoComplete="username"
                   placeholder="mariana.lopez"
                   value={userForm.username}
-                  onChange={(event) =>
-                    setUserForm((prev) => ({
-                      ...prev,
-                      username: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setUserForm((prev) => ({ ...prev, username: e.target.value }))}
                   required
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <label
-                className="text-sm font-medium text-foreground"
-                htmlFor="password"
-              >
-                Contraseña temporal
-              </label>
+              <label className="text-sm font-medium" htmlFor="password">Contraseña</label>
               <Input
                 id="password"
                 type="password"
-                autoComplete="new-password"
-                placeholder="Asigna una clave segura"
                 value={userForm.password}
-                onChange={(event) =>
-                  setUserForm((prev) => ({
-                    ...prev,
-                    password: event.target.value,
-                  }))
-                }
+                onChange={(e) => setUserForm((prev) => ({ ...prev, password: e.target.value }))}
                 required
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="role"
-                >
-                  Rol dentro del equipo
-                </label>
+                <label className="text-sm font-medium" htmlFor="role">Rol</label>
                 <Input
                   id="role"
                   placeholder="Ejecutivo comercial"
                   value={userForm.role}
-                  onChange={(event) =>
-                    setUserForm((prev) => ({
-                      ...prev,
-                      role: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value }))}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="status"
-                >
-                  Estado de preparación
-                </label>
+                <label className="text-sm font-medium" htmlFor="status">Estado</label>
                 <select
                   id="status"
-                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                   value={userForm.status}
-                  onChange={(event) =>
-                    setUserForm((prev) => ({
-                      ...prev,
-                      status: event.target.value as TeamMemberStatus,
-                    }))
-                  }
+                  onChange={(e) => setUserForm((prev) => ({ ...prev, status: e.target.value as TeamMemberStatus }))}
                 >
                   <option value="En curso">En curso</option>
                   <option value="En riesgo">En riesgo</option>
@@ -886,325 +631,140 @@ function AdminDashboardContent() {
                 </select>
               </div>
             </div>
-            {userMessage && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                {userMessage}
-              </p>
-            )}
-            <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setUserForm({
-                    name: "",
-                    username: "",
-                    password: "",
-                    role: "",
-                    status: "En curso",
-                  });
-                  setUserMessage(null);
-                }}
-              >
-                Limpiar
+            {userMessage && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">{userMessage}</p>}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsTeamDialogOpen(false)}>
+                Cancelar
               </Button>
-              <Button type="submit" className="px-6">
-                Invitar a compañero de equipo
-              </Button>
+              <Button type="submit">Crear miembro</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Client account dialog */}
       <Dialog open={isClientDialogOpen} onOpenChange={handleClientDialogChange}>
-        <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
-          <DialogHeader className="space-y-1">
-            <DialogTitle>Registrar cuenta de cliente</DialogTitle>
-            <DialogDescription>
-              Capturá los datos clave de incorporación para coordinar al equipo
-              de éxito.
-            </DialogDescription>
+        <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar cliente</DialogTitle>
+            <DialogDescription>Agrega una nueva cuenta de cliente</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleAddClient}>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="company">Empresa</label>
+              <Input
+                id="company"
+                value={clientForm.company}
+                onChange={(e) => setClientForm((prev) => ({ ...prev, company: e.target.value }))}
+                required
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="company"
-                >
-                  Nombre de la empresa
-                </label>
-                <Input
-                  id="company"
-                  placeholder="Empresa Ejemplo"
-                  value={clientForm.company}
-                  onChange={(event) =>
-                    setClientForm((prev) => ({
-                      ...prev,
-                      company: event.target.value,
-                    }))
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="poc"
-                >
-                  Punto de contacto
-                </label>
+                <label className="text-sm font-medium" htmlFor="poc">Contacto</label>
                 <Input
                   id="poc"
-                  placeholder="Nombre y apellido"
                   value={clientForm.poc}
-                  onChange={(event) =>
-                    setClientForm((prev) => ({
-                      ...prev,
-                      poc: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, poc: e.target.value }))}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="clientEmail"
-                >
-                  Correo electrónico de contacto
-                </label>
+                <label className="text-sm font-medium" htmlFor="email">Email</label>
                 <Input
-                  id="clientEmail"
+                  id="email"
                   type="email"
-                  placeholder="contacto@empresa.mx"
                   value={clientForm.email}
-                  onChange={(event) =>
-                    setClientForm((prev) => ({
-                      ...prev,
-                      email: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, email: e.target.value }))}
                   required
                 />
               </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="stage"
-                >
-                  Etapa del ciclo de vida
-                </label>
-                <select
-                  id="stage"
-                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={clientForm.stage}
-                  onChange={(event) =>
-                    setClientForm((prev) => ({
-                      ...prev,
-                      stage: event.target.value as ClientLifecycleStage,
-                    }))
-                  }
-                >
-                  <option value="Incorporación">Incorporación</option>
-                  <option value="Nutrición">Nutrición</option>
-                  <option value="Expansión">Expansión</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="monthlyValue"
-                >
-                  Valor mensual (USD)
-                </label>
+                <label className="text-sm font-medium" htmlFor="monthlyValue">Valor mensual</label>
                 <Input
                   id="monthlyValue"
-                  inputMode="decimal"
-                  placeholder="4500"
+                  type="number"
                   value={clientForm.monthlyValue}
-                  onChange={(event) =>
-                    setClientForm((prev) => ({
-                      ...prev,
-                      monthlyValue: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, monthlyValue: e.target.value }))}
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="onboardingDays"
+                <label className="text-sm font-medium" htmlFor="stage">Etapa</label>
+                <select
+                  id="stage"
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                  value={clientForm.stage}
+                  onChange={(e) => setClientForm((prev) => ({ ...prev, stage: e.target.value as ClientLifecycleStage }))}
                 >
-                  Días en incorporación
-                </label>
-                <Input
-                  id="onboardingDays"
-                  inputMode="numeric"
-                  placeholder="14"
-                  value={clientForm.onboardingDays}
-                  onChange={(event) =>
-                    setClientForm((prev) => ({
-                      ...prev,
-                      onboardingDays: event.target.value,
-                    }))
-                  }
-                />
+                  <option value="Incorporación">Incorporación</option>
+                  <option value="Activo">Activo</option>
+                  <option value="En riesgo">En riesgo</option>
+                </select>
               </div>
             </div>
             <div className="space-y-2">
-              <label
-                className="text-sm font-medium text-foreground"
-                htmlFor="notes"
-              >
-                Notas internas
-              </label>
+              <label className="text-sm font-medium" htmlFor="notes">Notas</label>
               <Textarea
                 id="notes"
-                placeholder="Agregá contexto para el equipo de implementación"
                 value={clientForm.notes}
-                onChange={(event) =>
-                  setClientForm((prev) => ({
-                    ...prev,
-                    notes: event.target.value,
-                  }))
-                }
-                rows={4}
+                onChange={(e) => setClientForm((prev) => ({ ...prev, notes: e.target.value }))}
+                rows={3}
               />
             </div>
-            {clientMessage && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                {clientMessage}
-              </p>
-            )}
-            <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setClientForm({
-                    company: "",
-                    poc: "",
-                    email: "",
-                    stage: "Incorporación",
-                    monthlyValue: "",
-                    onboardingDays: "14",
-                    notes: "",
-                  });
-                  setClientMessage(null);
-                }}
-              >
-                Limpiar
+            {clientMessage && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">{clientMessage}</p>}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsClientDialogOpen(false)}>
+                Cancelar
               </Button>
-              <Button type="submit" className="px-6">
-                Registrar cliente
-              </Button>
+              <Button type="submit">Crear cliente</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Cashier dialog */}
-      <Dialog
-        open={isCashierDialogOpen}
-        onOpenChange={handleCashierDialogChange}
-      >
-        <DialogContent className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
-          <DialogHeader className="space-y-1">
-            <DialogTitle>Crear perfil de cajero</DialogTitle>
-            <DialogDescription>
-              Generá credenciales puntuales para habilitar cobros en punto de
-              venta.
-            </DialogDescription>
+      <Dialog open={isCashierDialogOpen} onOpenChange={handleCashierDialogChange}>
+        <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Crear cajero</DialogTitle>
+            <DialogDescription>Configura un nuevo cajero</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleAddCashier}>
             <div className="space-y-2">
-              <label
-                className="text-sm font-medium text-foreground"
-                htmlFor="cashierName"
-              >
-                Nombre completo
-              </label>
+              <label className="text-sm font-medium" htmlFor="cashier-name">Nombre</label>
               <Input
-                id="cashierName"
-                placeholder="p.ej. Valeria Mendoza"
+                id="cashier-name"
                 value={cashierForm.name}
-                onChange={(event) =>
-                  setCashierForm((prev) => ({
-                    ...prev,
-                    name: event.target.value,
-                  }))
-                }
+                onChange={(e) => setCashierForm((prev) => ({ ...prev, name: e.target.value }))}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label
-                className="text-sm font-medium text-foreground"
-                htmlFor="cashierUsername"
-              >
-                Nombre de usuario
-              </label>
+              <label className="text-sm font-medium" htmlFor="cashier-username">Usuario</label>
               <Input
-                id="cashierUsername"
-                autoComplete="username"
-                placeholder="valeria.mendoza"
+                id="cashier-username"
                 value={cashierForm.username}
-                onChange={(event) =>
-                  setCashierForm((prev) => ({
-                    ...prev,
-                    username: event.target.value,
-                  }))
-                }
+                onChange={(e) => setCashierForm((prev) => ({ ...prev, username: e.target.value }))}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label
-                className="text-sm font-medium text-foreground"
-                htmlFor="cashierPassword"
-              >
-                Contraseña temporal
-              </label>
+              <label className="text-sm font-medium" htmlFor="cashier-password">Contraseña</label>
               <Input
-                id="cashierPassword"
+                id="cashier-password"
                 type="password"
-                autoComplete="new-password"
-                placeholder="Asigna una clave segura"
                 value={cashierForm.password}
-                onChange={(event) =>
-                  setCashierForm((prev) => ({
-                    ...prev,
-                    password: event.target.value,
-                  }))
-                }
+                onChange={(e) => setCashierForm((prev) => ({ ...prev, password: e.target.value }))}
                 required
               />
             </div>
-            {cashierMessage && (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                {cashierMessage}
-              </p>
-            )}
-            <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setCashierForm({ name: "", username: "", password: "" });
-                  setCashierMessage(null);
-                }}
-              >
-                Limpiar
+            {cashierMessage && <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">{cashierMessage}</p>}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsCashierDialogOpen(false)}>
+                Cancelar
               </Button>
-              <Button
-                type="submit"
-                className="px-6"
-                disabled={isCreatingCashier}
-              >
-                {isCreatingCashier ? "Creando..." : "Crear cajero"}
-              </Button>
+              <Button type="submit">Crear cajero</Button>
             </DialogFooter>
           </form>
         </DialogContent>

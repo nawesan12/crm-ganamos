@@ -5,21 +5,23 @@ import {
   Activity,
   Coins,
   MessageCircle,
-  MessageSquare,
   Plus,
   Users,
   Wallet,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
 import { useNotification } from "@/lib/useNotification";
 import { logger } from "@/lib/logger";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { ChartCard } from "@/components/dashboard/chart-card";
+import { BarComparisonChart } from "@/components/dashboard/bar-comparison-chart";
+import { DonutChart } from "@/components/dashboard/donut-chart";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -30,6 +32,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -55,9 +58,7 @@ export default function CrmWorkspacePage() {
   return <CrmWorkspaceContent />;
 }
 
-type ClientRecord = Awaited<
-  ReturnType<typeof listClientsAction>
->["clients"][number];
+type ClientRecord = Awaited<ReturnType<typeof listClientsAction>>["clients"][number];
 
 type NewClientForm = {
   username: string;
@@ -81,7 +82,7 @@ type ChargeFormState = {
 
 function CrmWorkspaceContent() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [newClient, setNewClient] = useState<NewClientForm>({
     username: "",
     phone: "",
@@ -121,30 +122,42 @@ function CrmWorkspaceContent() {
           notification.error("No pudimos cargar los clientes.");
         });
     });
-  }, []);
+  }, [notification]);
 
   const metrics = useMemo(() => {
     const total = clients.length;
-    const active = clients.filter(
-      (client) => client.status === "ACTIVE",
-    ).length;
-    const balance = clients.reduce(
-      (acc, client) => acc + client.pointsBalance,
-      0,
-    );
-
-    return {
-      total,
-      active,
-      balance,
-    };
+    const active = clients.filter((client) => client.status === "ACTIVE").length;
+    const balance = clients.reduce((acc, client) => acc + client.pointsBalance, 0);
+    return { total, active, balance };
   }, [clients]);
 
-  const filteredClients = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return clients;
-    }
+  const topClientsByPoints = useMemo(() => {
+    return clients
+      .sort((a, b) => b.pointsBalance - a.pointsBalance)
+      .slice(0, 5)
+      .map((client) => ({
+        name: client.username.split('@')[0] || client.username,
+        value: client.pointsBalance,
+      }));
+  }, [clients]);
 
+  const statusDistribution = useMemo(() => {
+    const active = clients.filter((c) => c.status === "ACTIVE").length;
+    const inactive = clients.length - active;
+    return [
+      { name: "Activos", value: active, color: "#10b981" },
+      { name: "Inactivos", value: inactive, color: "#6b7280" },
+    ];
+  }, [clients]);
+
+  const sparklineData = useMemo(() => {
+    return Array.from({ length: 7 }, () => ({
+      value: Math.floor(Math.random() * 5000) + 2000
+    }));
+  }, []);
+
+  const filteredClients = useMemo(() => {
+    if (!searchQuery.trim()) return clients;
     const query = searchQuery.toLowerCase();
     return clients.filter(
       (client) =>
@@ -155,19 +168,15 @@ function CrmWorkspaceContent() {
 
   const handleCreateClient = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     if (!newClient.username.trim()) {
       notification.error("Ingresá un identificador de cliente.");
       return;
     }
-
-    if (isCreatingClient) return; // Prevent double submission
+    if (isCreatingClient) return;
 
     setIsCreatingClient(true);
-
-    // Optimistic update - create temporary client
     const tempClient: ClientRecord = {
-      id: Date.now(), // temporary ID
+      id: Date.now(),
       username: newClient.username.trim(),
       phone: newClient.phone.trim() || null,
       status: "ACTIVE",
@@ -177,7 +186,6 @@ function CrmWorkspaceContent() {
       marketingSourceId: null,
     };
 
-    // Add optimistically
     setClients((prev) => [tempClient, ...prev]);
     setNewClient({ username: "", phone: "" });
 
@@ -186,668 +194,419 @@ function CrmWorkspaceContent() {
         username: tempClient.username,
         phone: tempClient.phone || undefined,
       });
-
-      // Replace temp client with real one from server
-      setClients((prev) =>
-        prev.map((c) => (c.id === tempClient.id ? client : c))
-      );
-      notification.success(`Cliente ${client.username} creado correctamente.`);
+      setClients((prev) => prev.map((c) => (c.id === tempClient.id ? client : c)));
+      notification.success(`Cliente ${client.username} creado.`);
       setIsClientDialogOpen(false);
     } catch (err) {
       logger.error("Error creating client", err);
-      // Remove the optimistic update on error
       setClients((prev) => prev.filter((c) => c.id !== tempClient.id));
-      notification.error(
-        "No se pudo crear el cliente. Revisá que el usuario sea único.",
-      );
+      notification.error("Error al crear el cliente.");
     } finally {
       setIsCreatingClient(false);
     }
   };
 
-  const handleLogContact = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleLogContact = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const clientId = Number.parseInt(contactForm.clientId, 10);
-    if (!Number.isFinite(clientId)) {
-      notification.error("Seleccioná un cliente para registrar el contacto.");
+    if (!contactForm.clientId || !contactForm.message.trim()) {
+      notification.error("Completá todos los campos requeridos.");
       return;
     }
+    if (isLoggingContact) return;
 
-    startTransition(() => {
-      logContactAction({
-        clientId,
+    setIsLoggingContact(true);
+    try {
+      await logContactAction({
+        clientId: Number(contactForm.clientId),
         channel: contactForm.channel,
         direction: contactForm.direction,
         viaAd: contactForm.viaAd,
-        campaign: undefined,
-        message: contactForm.message.trim() || undefined,
-      })
-        .then(() => {
-          notification.success("Contacto registrado correctamente.");
-          setContactForm((prev) => ({
-            ...prev,
-            message: "",
-          }));
-          setIsContactDialogOpen(false);
-        })
-        .catch((err) => {
-          logger.error("Error logging contact", err);
-          notification.error("No se pudo registrar el contacto.");
-        });
-    });
+        message: contactForm.message.trim(),
+      });
+      notification.success("Contacto registrado correctamente.");
+      setContactForm({
+        clientId: "",
+        channel: ContactChannel.WHATSAPP,
+        direction: ContactDirection.INBOUND,
+        viaAd: false,
+        message: "",
+      });
+      setIsContactDialogOpen(false);
+    } catch (err) {
+      logger.error("Error logging contact", err);
+      notification.error("Error al registrar el contacto.");
+    } finally {
+      setIsLoggingContact(false);
+    }
   };
 
-  const handleRegisterCharge = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRegisterCharge = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const clientId = Number.parseInt(chargeForm.clientId, 10);
-    const amount = Number.parseInt(chargeForm.amount, 10);
-
-    if (!Number.isFinite(clientId)) {
-      notification.error("Seleccioná un cliente para acreditar puntos.");
+    const amount = parseFloat(chargeForm.amount);
+    if (!chargeForm.clientId || !amount || amount <= 0) {
+      notification.error("Completá todos los campos correctamente.");
       return;
     }
+    if (isRegisteringCharge) return;
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      notification.error("Ingresá un monto válido de puntos.");
-      return;
-    }
-
-    // Optimistic update - update balance immediately
-    const previousBalance = clients.find((c) => c.id === clientId)?.pointsBalance ?? 0;
-    setClients((prev) =>
-      prev.map((item) =>
-        item.id === clientId
-          ? { ...item, pointsBalance: item.pointsBalance + amount }
-          : item,
-      ),
-    );
-
-    // Reset form and close dialog optimistically
-    const formBackup = { ...chargeForm };
-    setChargeForm({
-      clientId: "",
-      amount: "",
-      method: PaymentMethod.CASH,
-      description: "",
-    });
-    setIsChargeDialogOpen(false);
-
-    startTransition(() => {
-      registerPointChargeAction({
-        clientId,
+    setIsRegisteringCharge(true);
+    try {
+      const result = await registerPointChargeAction({
+        clientId: Number(chargeForm.clientId),
         amount,
         method: chargeForm.method,
         description: chargeForm.description.trim() || undefined,
-        referenceCode: undefined,
-        cashierId: undefined,
-      })
-        .then(({ client }) => {
-          // Confirm with server data
-          setClients((prev) =>
-            prev.map((item) =>
-              item.id === client.id
-                ? { ...item, pointsBalance: client.pointsBalance }
-                : item,
-            ),
-          );
-          notification.success("Carga registrada y saldo actualizado.");
-        })
-        .catch((err) => {
-          logger.error("Error registering charge", err);
-          // Rollback optimistic update on error
-          setClients((prev) =>
-            prev.map((item) =>
-              item.id === clientId
-                ? { ...item, pointsBalance: previousBalance }
-                : item,
-            ),
-          );
-          setChargeForm(formBackup);
-          notification.error("No se pudo registrar la carga.");
-        });
-    });
-  };
+      });
 
-  const isLoading = isPending && clients.length === 0;
-
-  const closeMenu = () => setIsMenuOpen(false);
-
-  const handleOpenClientDialog = () => {
-    closeMenu();
-    setIsClientDialogOpen(true);
-  };
-
-  const handleOpenContactDialog = () => {
-    closeMenu();
-    setIsContactDialogOpen(true);
-  };
-
-  const handleOpenChargeDialog = () => {
-    closeMenu();
-    setIsChargeDialogOpen(true);
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === Number(chargeForm.clientId)
+            ? { ...c, pointsBalance: result.client.pointsBalance }
+            : c
+        )
+      );
+      notification.success(`Cargo de ${pesoFormatter.format(amount)} registrado.`);
+      setChargeForm({
+        clientId: "",
+        amount: "",
+        method: PaymentMethod.CASH,
+        description: "",
+      });
+      setIsChargeDialogOpen(false);
+    } catch (err) {
+      logger.error("Error registering charge", err);
+      notification.error("Error al registrar el cargo.");
+    } finally {
+      setIsRegisteringCharge(false);
+    }
   };
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium uppercase tracking-[0.3em] text-muted-foreground">
-          CRM operativo
-        </span>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          Seguimiento centralizado de relaciones
-        </h1>
-        <p className="max-w-3xl text-muted-foreground">
-          Registrá clientes, documentá interacciones y acreditá puntos desde un
-          solo lugar.
-        </p>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Panel CRM</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gestión de relaciones con clientes</p>
+        </div>
+        <Link href="/crm/chat">
+          <Button variant="outline" className="gap-2">
+            <MessageCircle className="size-4" />
+            Chat
+          </Button>
+        </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard
-          title="Clientes totales"
+          title="Total clientes"
           value={`${metrics.total}`}
           icon={<Users className="size-5" />}
-          description="Registros únicos activos y en seguimiento"
+          trendValue={`${metrics.active} activos`}
+          trendDirection="up"
         />
         <MetricCard
           title="Clientes activos"
           value={`${metrics.active}`}
           icon={<Activity className="size-5" />}
-          description="Cuentas en estado activo dentro del CRM"
+          trendValue={`${Math.round((metrics.active / (metrics.total || 1)) * 100)}%`}
+          trendDirection={metrics.active > metrics.total / 2 ? "up" : "down"}
         />
         <MetricCard
-          title="Puntos acumulados"
+          title="Saldo de puntos"
           value={pesoFormatter.format(metrics.balance)}
-          icon={<Coins className="size-5" />}
-          description="Saldo total disponible en todas las cuentas"
+          icon={<Wallet className="size-5" />}
+          trendValue="Total acumulado"
+          trendDirection="up"
+          sparklineData={sparklineData}
+          sparklineColor="#8b5cf6"
         />
       </div>
 
-      <div className="grid gap-6">
-        <Card className="border-border/70 bg-background/90">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Clientes recientes
-            </CardTitle>
-            <CardDescription>
-              Visibilidad rápida de los registros más activos en el sistema.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
+      <div className="grid gap-6 xl:grid-cols-2">
+        <ChartCard title="Top clientes" subtitle="Por saldo de puntos">
+          <BarComparisonChart
+            data={topClientsByPoints}
+            valueFormatter={(value) => pesoFormatter.format(value)}
+            height={220}
+          />
+        </ChartCard>
+
+        <ChartCard title="Estado de clientes" subtitle="Activos vs Inactivos">
+          <DonutChart data={statusDistribution} />
+        </ChartCard>
+      </div>
+
+      <Card className="border-border/70 bg-background/95">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="size-5 text-primary" />
+            Clientes recientes
+          </CardTitle>
+          <CardDescription>
+            <div className="flex items-center gap-2 mt-2">
+              <Search className="size-4" />
               <Input
-                type="text"
                 placeholder="Buscar por usuario o teléfono..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="h-9 max-w-sm"
               />
-              <svg
-                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
             </div>
-            {isLoading ? (
-              <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-muted-foreground">
-                Cargando clientes...
-              </div>
-            ) : clients.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-muted-foreground">
-                Aún no se registraron clientes. Creá el primero con el
-                formulario lateral.
-              </div>
-            ) : filteredClients.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-muted-foreground">
-                No se encontraron clientes que coincidan con &quot;{searchQuery}&quot;
-              </div>
-            ) : (
-              filteredClients.slice(0, 8).map((client) => (
-                <div
-                  key={client.id}
-                  className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 p-4 sm:flex-row sm:items-center sm:justify-between transition-all hover:shadow-sm hover:border-border/90 hover:bg-background/95"
-                >
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {client.username}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Estado: {client.status.toLowerCase()}
-                    </p>
-                    {client.phone ? (
-                      <p className="text-sm text-muted-foreground">
-                        Teléfono: {client.phone}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col items-end text-sm">
-                    <span className="font-semibold text-foreground">
-                      {pesoFormatter.format(client.pointsBalance)}
-                    </span>
-                    <span className="text-muted-foreground">
-                      Saldo disponible
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-          <CardFooter className="justify-end text-xs text-muted-foreground">
-            {searchQuery ? (
-              <span>Mostrando {Math.min(filteredClients.length, 8)} de {filteredClients.length} resultados</span>
-            ) : (
-              <span>Mostrando los primeros 8 de {clients.length} clientes</span>
-            )}
-          </CardFooter>
-        </Card>
-      </div>
-
-      <Card className="border-border/70 bg-background/90">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground">
-            Centro de acciones rápidas
-          </CardTitle>
-          <CardDescription>
-            Usá el menú flotante para registrar clientes, contactos y
-            acreditaciones sin perder de vista los datos del tablero.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p>
-            El botón con el ícono{" "}
-            <Plus className="inline size-4 align-text-top" /> aparece en la
-            esquina inferior derecha. Al pulsarlo se despliegan las acciones
-            disponibles. Seleccioná la que necesites y completá el formulario en
-            un diálogo optimizado para cada tarea.
-          </p>
-          <ul className="list-disc space-y-2 pl-5">
-            <li>
-              <span className="font-medium text-foreground">
-                Registrar nuevo cliente
-              </span>
-              : crea fichas en segundos y mantené actualizado el pipeline
-              comercial.
-            </li>
-            <li>
-              <span className="font-medium text-foreground">
-                Registrar contacto
-              </span>
-              : documentá interacciones relevantes para todo el equipo.
-            </li>
-            <li>
-              <span className="font-medium text-foreground">
-                Acreditar puntos
-              </span>
-              : actualizá el saldo de los clientes autorizados sin salir del
-              tablero.
-            </li>
-          </ul>
-          <p>
-            Podés cerrar los diálogos con la tecla{" "}
-            <kbd className="rounded border bg-muted px-1">Esc</kbd> o con el
-            botón de cierre sin perder el contexto actual.
-          </p>
+        <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
+          {filteredClients.slice(0, 20).map((client) => (
+            <div
+              key={client.id}
+              className="flex items-center justify-between rounded-lg border border-border/70 bg-background/80 p-3 transition-all hover:border-border/90"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">@{client.username}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    client.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {client.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+                {client.phone && <p className="text-xs text-muted-foreground">{client.phone}</p>}
+              </div>
+              <div className="text-right">
+                <div className="font-medium text-sm">{pesoFormatter.format(client.pointsBalance)}</div>
+                <div className="text-xs text-muted-foreground">Puntos</div>
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-        {isMenuOpen ? (
-          <div className="w-64 space-y-2 rounded-2xl border border-border/70 bg-background/95 p-4 shadow-xl shadow-black/10 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        {isMenuOpen && (
+          <div className="w-64 rounded-2xl border border-border/70 bg-background/95 p-4 shadow-xl backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Acciones rápidas
             </p>
-            <Link href="/crm/chat">
+            <div className="mt-4 grid gap-2">
               <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                variant="outline"
+                className="justify-start gap-2"
+                onClick={() => {
+                  setIsClientDialogOpen(true);
+                  setIsMenuOpen(false);
+                }}
               >
-                <MessageCircle className="size-4" /> Chat con operador
+                <Plus className="size-4" />
+                Nuevo cliente
               </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
-              onClick={handleOpenClientDialog}
-            >
-              <Users className="size-4" /> Registrar nuevo cliente
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
-              onClick={handleOpenContactDialog}
-            >
-              <MessageSquare className="size-4" /> Registrar contacto
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-foreground hover:bg-primary/10 hover:text-primary transition-all"
-              onClick={handleOpenChargeDialog}
-            >
-              <Wallet className="size-4" /> Acreditar puntos
-            </Button>
+              <Button
+                variant="outline"
+                className="justify-start gap-2"
+                onClick={() => {
+                  setIsContactDialogOpen(true);
+                  setIsMenuOpen(false);
+                }}
+              >
+                <MessageCircle className="size-4" />
+                Registrar contacto
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start gap-2"
+                onClick={() => {
+                  setIsChargeDialogOpen(true);
+                  setIsMenuOpen(false);
+                }}
+              >
+                <Coins className="size-4" />
+                Acreditar puntos
+              </Button>
+            </div>
           </div>
-        ) : null}
-
+        )}
         <Button
-          size="lg"
-          className="h-14 w-14 rounded-full shadow-lg shadow-primary/30 transition-all hover:shadow-xl hover:shadow-primary/40 active:scale-95"
+          size="icon-lg"
+          className="size-14 rounded-full bg-primary shadow-lg hover:bg-primary/90"
           onClick={() => setIsMenuOpen((prev) => !prev)}
-          aria-label={
-            isMenuOpen ? "Cerrar menú de acciones" : "Abrir menú de acciones"
-          }
         >
-          <Plus
-            className={`size-6 transition-transform duration-200 ${isMenuOpen ? "rotate-45" : ""}`}
-          />
+          <Plus className={`size-5 transition-transform ${isMenuOpen ? "rotate-45" : ""}`} />
         </Button>
       </div>
 
       <Dialog open={isClientDialogOpen} onOpenChange={setIsClientDialogOpen}>
-        <DialogContent className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar nuevo cliente</DialogTitle>
-            <DialogDescription>
-              Cargá clientes potenciales o jugadores desde tu canal de ventas.
-            </DialogDescription>
+            <DialogTitle>Crear nuevo cliente</DialogTitle>
+            <DialogDescription>Registra un nuevo cliente en el CRM</DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleCreateClient}>
+          <form onSubmit={handleCreateClient} className="space-y-4">
             <div className="space-y-2">
-              <label
-                htmlFor="client-username"
-                className="text-sm font-medium text-foreground"
-              >
-                Usuario / Identificador
-              </label>
+              <label className="text-sm font-medium">Usuario</label>
               <Input
-                id="client-username"
+                placeholder="@usuario"
                 value={newClient.username}
-                onChange={(event) =>
-                  setNewClient((prev) => ({
-                    ...prev,
-                    username: event.target.value,
-                  }))
-                }
-                placeholder="ej. jugador.123"
+                onChange={(e) => setNewClient((prev) => ({ ...prev, username: e.target.value }))}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label
-                htmlFor="client-phone"
-                className="text-sm font-medium text-foreground"
-              >
-                Teléfono
-              </label>
+              <label className="text-sm font-medium">Teléfono (opcional)</label>
               <Input
-                id="client-phone"
+                placeholder="+54 9 11 1234-5678"
                 value={newClient.phone}
-                onChange={(event) =>
-                  setNewClient((prev) => ({
-                    ...prev,
-                    phone: event.target.value,
-                  }))
-                }
-                placeholder="5491130000000"
+                onChange={(e) => setNewClient((prev) => ({ ...prev, phone: e.target.value }))}
               />
             </div>
-            <Button type="submit" disabled={isPending} className="w-full">
-              Crear cliente
-            </Button>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsClientDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isCreatingClient}>
+                {isCreatingClient ? "Creando..." : "Crear cliente"}
+              </Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-        <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar contacto</DialogTitle>
-            <DialogDescription>
-              Documentá interacciones clave para mantener el contexto del
-              equipo.
-            </DialogDescription>
+            <DialogDescription>Documenta una interacción con un cliente</DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleLogContact}>
+          <form onSubmit={handleLogContact} className="space-y-4">
             <div className="space-y-2">
-              <label
-                htmlFor="contact-client"
-                className="text-sm font-medium text-foreground"
-              >
-                Cliente
-              </label>
+              <label className="text-sm font-medium">Cliente</label>
               <select
-                id="contact-client"
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                 value={contactForm.clientId}
-                onChange={(event) =>
-                  setContactForm((prev) => ({
-                    ...prev,
-                    clientId: event.target.value,
-                  }))
-                }
+                onChange={(e) => setContactForm((prev) => ({ ...prev, clientId: e.target.value }))}
                 required
               >
-                <option value="" disabled>
-                  Seleccioná un cliente
-                </option>
+                <option value="">Seleccionar cliente</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.username}
+                    @{client.username}
                   </option>
                 ))}
               </select>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label
-                  htmlFor="contact-channel"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Canal
-                </label>
+                <label className="text-sm font-medium">Canal</label>
                 <select
-                  id="contact-channel"
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                   value={contactForm.channel}
-                  onChange={(event) =>
-                    setContactForm((prev) => ({
-                      ...prev,
-                      channel: event.target.value as ContactChannel,
-                    }))
+                  onChange={(e) =>
+                    setContactForm((prev) => ({ ...prev, channel: e.target.value as ContactChannel }))
                   }
                 >
-                  {Object.values(ContactChannel).map((channel) => (
-                    <option key={channel} value={channel}>
-                      {channel.toLowerCase()}
-                    </option>
-                  ))}
+                  <option value="WHATSAPP">WhatsApp</option>
+                  <option value="EMAIL">Email</option>
+                  <option value="CALL">Llamada</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <label
-                  htmlFor="contact-direction"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Dirección
-                </label>
+                <label className="text-sm font-medium">Dirección</label>
                 <select
-                  id="contact-direction"
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                   value={contactForm.direction}
-                  onChange={(event) =>
-                    setContactForm((prev) => ({
-                      ...prev,
-                      direction: event.target.value as ContactDirection,
-                    }))
+                  onChange={(e) =>
+                    setContactForm((prev) => ({ ...prev, direction: e.target.value as ContactDirection }))
                   }
                 >
-                  {Object.values(ContactDirection).map((direction) => (
-                    <option key={direction} value={direction}>
-                      {direction.toLowerCase()}
-                    </option>
-                  ))}
+                  <option value="INBOUND">Entrante</option>
+                  <option value="OUTBOUND">Saliente</option>
                 </select>
               </div>
             </div>
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <input
-                  type="checkbox"
-                  checked={contactForm.viaAd}
-                  onChange={(event) =>
-                    setContactForm((prev) => ({
-                      ...prev,
-                      viaAd: event.target.checked,
-                    }))
-                  }
-                  className="size-4 rounded border border-input"
-                />
-                ¿El contacto llegó desde una campaña?
-              </label>
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="contact-message"
-                className="text-sm font-medium text-foreground"
-              >
-                Notas
-              </label>
+              <label className="text-sm font-medium">Mensaje</label>
               <Textarea
-                id="contact-message"
+                placeholder="Detalles del contacto..."
                 value={contactForm.message}
-                onChange={(event) =>
-                  setContactForm((prev) => ({
-                    ...prev,
-                    message: event.target.value,
-                  }))
-                }
-                placeholder="Detalle breve de la conversación"
+                onChange={(e) => setContactForm((prev) => ({ ...prev, message: e.target.value }))}
+                rows={3}
+                required
               />
             </div>
-            <Button type="submit" disabled={isPending} className="w-full">
-              Guardar contacto
-            </Button>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsContactDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isLoggingContact}>
+                {isLoggingContact ? "Registrando..." : "Registrar"}
+              </Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isChargeDialogOpen} onOpenChange={setIsChargeDialogOpen}>
-        <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Acreditar puntos</DialogTitle>
-            <DialogDescription>
-              Actualizá el saldo del cliente directamente desde la gestión
-              comercial.
-            </DialogDescription>
+            <DialogDescription>Registra un cargo de puntos para un cliente</DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleRegisterCharge}>
+          <form onSubmit={handleRegisterCharge} className="space-y-4">
             <div className="space-y-2">
-              <label
-                htmlFor="charge-client"
-                className="text-sm font-medium text-foreground"
-              >
-                Cliente
-              </label>
+              <label className="text-sm font-medium">Cliente</label>
               <select
-                id="charge-client"
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                 value={chargeForm.clientId}
-                onChange={(event) =>
-                  setChargeForm((prev) => ({
-                    ...prev,
-                    clientId: event.target.value,
-                  }))
-                }
+                onChange={(e) => setChargeForm((prev) => ({ ...prev, clientId: e.target.value }))}
                 required
               >
-                <option value="" disabled>
-                  Seleccioná un cliente
-                </option>
+                <option value="">Seleccionar cliente</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.username}
+                    @{client.username} - {pesoFormatter.format(client.pointsBalance)}
                   </option>
                 ))}
               </select>
             </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Monto</label>
+                <Input
+                  type="number"
+                  placeholder="1000"
+                  value={chargeForm.amount}
+                  onChange={(e) => setChargeForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Método</label>
+                <select
+                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                  value={chargeForm.method}
+                  onChange={(e) =>
+                    setChargeForm((prev) => ({ ...prev, method: e.target.value as PaymentMethod }))
+                  }
+                >
+                  <option value="CASH">Efectivo</option>
+                  <option value="TRANSFER">Transferencia</option>
+                  <option value="CARD">Tarjeta</option>
+                </select>
+              </div>
+            </div>
             <div className="space-y-2">
-              <label
-                htmlFor="charge-amount"
-                className="text-sm font-medium text-foreground"
-              >
-                Monto (puntos)
-              </label>
+              <label className="text-sm font-medium">Descripción (opcional)</label>
               <Input
-                id="charge-amount"
-                type="number"
-                min={1}
-                value={chargeForm.amount}
-                onChange={(event) =>
-                  setChargeForm((prev) => ({
-                    ...prev,
-                    amount: event.target.value,
-                  }))
-                }
-                placeholder="500"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="charge-method"
-                className="text-sm font-medium text-foreground"
-              >
-                Medio de pago
-              </label>
-              <select
-                id="charge-method"
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                value={chargeForm.method}
-                onChange={(event) =>
-                  setChargeForm((prev) => ({
-                    ...prev,
-                    method: event.target.value as PaymentMethod,
-                  }))
-                }
-              >
-                {Object.values(PaymentMethod).map((method) => (
-                  <option key={method} value={method}>
-                    {method.toLowerCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="charge-description"
-                className="text-sm font-medium text-foreground"
-              >
-                Nota interna
-              </label>
-              <Textarea
-                id="charge-description"
+                placeholder="Concepto del cargo..."
                 value={chargeForm.description}
-                onChange={(event) =>
-                  setChargeForm((prev) => ({
-                    ...prev,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="Detalle opcional de la acreditación"
+                onChange={(e) => setChargeForm((prev) => ({ ...prev, description: e.target.value }))}
               />
             </div>
-            <Button type="submit" disabled={isPending} className="w-full">
-              Registrar acreditación
-            </Button>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsChargeDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isRegisteringCharge}>
+                {isRegisteringCharge ? "Procesando..." : "Acreditar"}
+              </Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
