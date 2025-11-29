@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useNotification } from "@/lib/useNotification";
+import { logger } from "@/lib/logger";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
@@ -102,6 +103,10 @@ function CrmWorkspaceContent() {
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [isChargeDialogOpen, setIsChargeDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const [isLoggingContact, setIsLoggingContact] = useState(false);
+  const [isRegisteringCharge, setIsRegisteringCharge] = useState(false);
 
   const notification = useNotification();
 
@@ -112,7 +117,7 @@ function CrmWorkspaceContent() {
           setClients(data.clients);
         })
         .catch((err) => {
-          console.error("Error loading clients", err);
+          logger.error("Error loading clients", err);
           notification.error("No pudimos cargar los clientes.");
         });
     });
@@ -135,13 +140,30 @@ function CrmWorkspaceContent() {
     };
   }, [clients]);
 
-  const handleCreateClient = (event: React.FormEvent<HTMLFormElement>) => {
+  const filteredClients = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return clients;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return clients.filter(
+      (client) =>
+        client.username.toLowerCase().includes(query) ||
+        (client.phone && client.phone.includes(query))
+    );
+  }, [clients, searchQuery]);
+
+  const handleCreateClient = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!newClient.username.trim()) {
       notification.error("Ingresá un identificador de cliente.");
       return;
     }
+
+    if (isCreatingClient) return; // Prevent double submission
+
+    setIsCreatingClient(true);
 
     // Optimistic update - create temporary client
     const tempClient: ClientRecord = {
@@ -158,29 +180,29 @@ function CrmWorkspaceContent() {
     // Add optimistically
     setClients((prev) => [tempClient, ...prev]);
     setNewClient({ username: "", phone: "" });
-    setIsClientDialogOpen(false);
 
-    startTransition(() => {
-      createClientAction({
+    try {
+      const client = await createClientAction({
         username: tempClient.username,
         phone: tempClient.phone || undefined,
-      })
-        .then((client) => {
-          // Replace temp client with real one from server
-          setClients((prev) =>
-            prev.map((c) => (c.id === tempClient.id ? client : c))
-          );
-          notification.success(`Cliente ${client.username} creado correctamente.`);
-        })
-        .catch((err) => {
-          console.error("Error creating client", err);
-          // Remove the optimistic update on error
-          setClients((prev) => prev.filter((c) => c.id !== tempClient.id));
-          notification.error(
-            "No se pudo crear el cliente. Revisá que el usuario sea único.",
-          );
-        });
-    });
+      });
+
+      // Replace temp client with real one from server
+      setClients((prev) =>
+        prev.map((c) => (c.id === tempClient.id ? client : c))
+      );
+      notification.success(`Cliente ${client.username} creado correctamente.`);
+      setIsClientDialogOpen(false);
+    } catch (err) {
+      logger.error("Error creating client", err);
+      // Remove the optimistic update on error
+      setClients((prev) => prev.filter((c) => c.id !== tempClient.id));
+      notification.error(
+        "No se pudo crear el cliente. Revisá que el usuario sea único.",
+      );
+    } finally {
+      setIsCreatingClient(false);
+    }
   };
 
   const handleLogContact = (event: React.FormEvent<HTMLFormElement>) => {
@@ -210,7 +232,7 @@ function CrmWorkspaceContent() {
           setIsContactDialogOpen(false);
         })
         .catch((err) => {
-          console.error("Error logging contact", err);
+          logger.error("Error logging contact", err);
           notification.error("No se pudo registrar el contacto.");
         });
     });
@@ -273,7 +295,7 @@ function CrmWorkspaceContent() {
           notification.success("Carga registrada y saldo actualizado.");
         })
         .catch((err) => {
-          console.error("Error registering charge", err);
+          logger.error("Error registering charge", err);
           // Rollback optimistic update on error
           setClients((prev) =>
             prev.map((item) =>
@@ -354,6 +376,28 @@ function CrmWorkspaceContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Buscar por usuario o teléfono..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+              <svg
+                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
             {isLoading ? (
               <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-muted-foreground">
                 Cargando clientes...
@@ -363,8 +407,12 @@ function CrmWorkspaceContent() {
                 Aún no se registraron clientes. Creá el primero con el
                 formulario lateral.
               </div>
+            ) : filteredClients.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/50 p-6 text-center text-muted-foreground">
+                No se encontraron clientes que coincidan con &quot;{searchQuery}&quot;
+              </div>
             ) : (
-              clients.slice(0, 8).map((client) => (
+              filteredClients.slice(0, 8).map((client) => (
                 <div
                   key={client.id}
                   className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 p-4 sm:flex-row sm:items-center sm:justify-between transition-all hover:shadow-sm hover:border-border/90 hover:bg-background/95"
@@ -395,7 +443,11 @@ function CrmWorkspaceContent() {
             )}
           </CardContent>
           <CardFooter className="justify-end text-xs text-muted-foreground">
-            Datos limitados a los últimos 50 clientes para agilizar la vista.
+            {searchQuery ? (
+              <span>Mostrando {Math.min(filteredClients.length, 8)} de {filteredClients.length} resultados</span>
+            ) : (
+              <span>Mostrando los primeros 8 de {clients.length} clientes</span>
+            )}
           </CardFooter>
         </Card>
       </div>

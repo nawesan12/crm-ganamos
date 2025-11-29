@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { logger } from "@/lib/logger";
 import {
   Card,
   CardContent,
@@ -105,7 +106,7 @@ function CashierDashboardContent() {
           setSheetSaving({});
         })
         .catch((error) => {
-          console.error("Error loading dashboard data", error);
+          logger.error("Error loading dashboard data", error);
         });
     });
   }, [selectedDate]);
@@ -251,7 +252,7 @@ function CashierDashboardContent() {
         [memberId]: `${coinFormatter.format(coins)} monedas registradas`,
       }));
     } catch (error) {
-      console.error("Error al registrar cargo", error);
+      logger.error("Error al registrar cargo", error);
       setRowFeedback((prev) => ({
         ...prev,
         [memberId]:
@@ -301,7 +302,7 @@ function CashierDashboardContent() {
           : "Marcado como no cargó.",
       }));
     } catch (error) {
-      console.error("Error al actualizar estado diario", error);
+      logger.error("Error al actualizar estado diario", error);
       setSheetFeedback((prev) => ({
         ...prev,
         [clientId]: "No se pudo actualizar el registro. Intente nuevamente.",

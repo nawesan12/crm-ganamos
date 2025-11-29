@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { logger } from "@/lib/logger";
 import {
   Card,
   CardContent,
@@ -131,7 +132,7 @@ function AdminDashboardContent() {
           setDashboardMetrics(data.metrics);
         })
         .catch((error) => {
-          console.error("Error loading admin dashboard data", error);
+          logger.error("Error loading admin dashboard data", error);
         });
     });
   }, []);
@@ -301,7 +302,7 @@ function AdminDashboardContent() {
       });
       setUserMessage(`${newMember.name} se agregó al espacio de trabajo.`);
     } catch (error) {
-      console.error("Error adding team member", error);
+      logger.error("Error adding team member", error);
       setUserMessage(
         "No se pudo agregar el compañero de equipo. Intente nuevamente.",
       );
@@ -332,7 +333,7 @@ function AdminDashboardContent() {
         setCashierForm({ name: "", username: "", password: "" });
         setCashierMessage(`${cashier.name} ahora puede operar como cajero.`);
       } catch (error) {
-        console.error("Error adding cashier", error);
+        logger.error("Error adding cashier", error);
         setCashierMessage("No se pudo crear el cajero. Intente nuevamente.");
       }
     });
@@ -379,7 +380,7 @@ function AdminDashboardContent() {
         `${newClient.company} ahora forma parte del pipeline de incorporación.`,
       );
     } catch (error) {
-      console.error("Error adding client account", error);
+      logger.error("Error adding client account", error);
       setClientMessage(
         "No se pudo crear la cuenta de cliente. Intente nuevamente.",
       );

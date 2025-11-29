@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import type { AuthRole, AuthUser } from "@/types/auth";
+import { logger } from "@/lib/logger";
 
 export type RegisterUserPayload = AuthUser;
 
@@ -73,7 +74,7 @@ export async function registerAction(
       user,
     };
   } catch (error) {
-    console.error("Error creating user", error);
+    logger.error("Error creating user", error);
 
     const knownError = error as { code?: string };
     if (knownError?.code === "P2002") {

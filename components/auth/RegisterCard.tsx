@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { getDashboardRouteForRole } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth-store";
+import { logger } from "@/lib/logger";
 
 export function RegisterCard() {
   const router = useRouter();
@@ -53,7 +54,7 @@ export function RegisterCard() {
       login(result.user);
       router.replace(getDashboardRouteForRole(result.user.role));
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       setError("Ocurrió un error al crear la cuenta. Intentá de nuevo.");
       setIsSubmitting(false);
     }

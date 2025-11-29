@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import type { AuthRole, AuthUser, LoginResponse } from "@/types/auth";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   let payload: unknown;
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
       user,
     });
   } catch (error) {
-    console.error("Login error", error);
+    logger.error("Login error", error);
     return NextResponse.json<LoginResponse>(
       {
         success: false,

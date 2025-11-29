@@ -3,6 +3,8 @@
  * Generates beep sounds for different notification types
  */
 
+import { logger } from './logger';
+
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
 interface BeepConfig {
@@ -51,7 +53,7 @@ class SoundNotificationManager {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize audio context:', error);
+      logger.error('Failed to initialize audio context:', error);
     }
   }
 
@@ -65,7 +67,7 @@ class SoundNotificationManager {
     }
 
     if (!this.audioContext) {
-      console.warn('Audio context not available');
+      logger.warn('Audio context not available');
       return;
     }
 
@@ -103,7 +105,7 @@ class SoundNotificationManager {
       oscillator.start(currentTime);
       oscillator.stop(currentTime + config.duration);
     } catch (error) {
-      console.error('Failed to play notification sound:', error);
+      logger.error('Failed to play notification sound:', error);
     }
   }
 
@@ -125,7 +127,7 @@ class SoundNotificationManager {
       try {
         await this.audioContext.resume();
       } catch (error) {
-        console.error('Failed to resume audio context:', error);
+        logger.error('Failed to resume audio context:', error);
       }
     }
   }

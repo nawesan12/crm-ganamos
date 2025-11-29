@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { getDashboardRouteForRole } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth-store";
 import type { LoginResponse } from "@/types/auth";
+import { logger } from "@/lib/logger";
 
 export function LoginCard() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export function LoginCard() {
       login(result.user);
       router.replace(getDashboardRouteForRole(result.user.role));
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       setError("Ocurrió un error al iniciar sesión. Intentá de nuevo.");
       setIsSubmitting(false);
     }

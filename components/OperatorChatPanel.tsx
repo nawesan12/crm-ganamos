@@ -5,10 +5,15 @@ import { io, Socket } from "socket.io-client";
 import Link from "next/link";
 import { ArrowLeft, Search, X, Loader2, UserPlus, Download } from "lucide-react";
 import { useNotification } from "@/lib/useNotification";
+import { soundManager } from "@/lib/sound-notifications";
+import { useNotificationSettings } from "@/stores/notification-settings-store";
+import { logger } from "@/lib/logger";
 import {
   saveChatMessageAction,
   getChatHistoryAction,
   getClientByUsernameAction,
+  getRecentChatsAction,
+  markMessagesAsReadAction,
 } from "@/actions/chat";
 import { createClientAction } from "@/actions/crm";
 import { MessageSenderType, MessageType } from "@prisma/client";
@@ -84,9 +89,11 @@ export default function OperatorChatPanel() {
   const [isCreateClientDialogOpen, setIsCreateClientDialogOpen] = useState(false);
   const [newClientData, setNewClientData] = useState({ username: "", phone: "" });
   const [clientToCreate, setClientToCreate] = useState<string | null>(null);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
 
   const user = useAuthStore((state) => state.user);
   const notification = useNotification();
+  const { getEffectiveVolume } = useNotificationSettings();
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -95,7 +102,27 @@ export default function OperatorChatPanel() {
   const activeClientIdRef = useRef<string | null>(null);
   useEffect(() => {
     activeClientIdRef.current = activeClientId;
-  }, [activeClientId]);
+
+    // Mark messages as read when switching to a chat
+    if (activeClientId && user) {
+      const chat = chats.find((c) => c.clientId === activeClientId);
+      if (chat && chat.clientDbId && chat.unread > 0) {
+        markMessagesAsReadAction({
+          clientId: chat.clientDbId,
+          operatorId: user.id,
+        }).then(() => {
+          // Update unread count in local state
+          setChats((prev) =>
+            prev.map((c) =>
+              c.clientId === activeClientId ? { ...c, unread: 0 } : c
+            )
+          );
+        }).catch((err) => {
+          logger.error("Error marking messages as read:", err);
+        });
+      }
+    }
+  }, [activeClientId, user, chats]);
 
   const operatorTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -114,6 +141,50 @@ export default function OperatorChatPanel() {
   }, [activeChat?.messages.length]);
 
   // ---------------- DATABASE HELPER FUNCTIONS ----------------
+
+  const loadRecentChats = async () => {
+    try {
+      setIsLoadingChats(true);
+      const recentChats = await getRecentChatsAction();
+
+      const chatsData: Chat[] = await Promise.all(
+        recentChats.map(async ({ client, unreadCount }) => {
+          // Load full history for each client
+          const history = await getChatHistoryAction({ clientId: client.id, limit: 100 });
+
+          const messages: Message[] = history.map((msg: any) => ({
+            from: msg.senderType === MessageSenderType.CLIENT ? "client" : "operator",
+            text: msg.text ?? undefined,
+            image: msg.imageUrl ?? undefined,
+            mimeType: msg.mimeType ?? undefined,
+            name: msg.imageName ?? undefined,
+            timestamp: msg.createdAt.toISOString(),
+            id: msg.id,
+            isRead: msg.isRead,
+            operatorId: msg.operatorId ?? undefined,
+            operatorName: msg.operator?.name ?? undefined,
+          }));
+
+          return {
+            clientId: `client_${client.id}`, // Create a consistent clientId
+            username: client.username,
+            messages,
+            unread: unreadCount,
+            isClientTyping: false,
+            clientDbId: client.id,
+            isLoadingHistory: false,
+          };
+        })
+      );
+
+      setChats(chatsData);
+    } catch (err) {
+      logger.error("Error loading recent chats:", err);
+      notification.error("No se pudieron cargar los chats recientes");
+    } finally {
+      setIsLoadingChats(false);
+    }
+  };
 
   const loadChatHistory = async (clientUsername: string, clientDbId: number) => {
     try {
@@ -140,7 +211,7 @@ export default function OperatorChatPanel() {
         )
       );
     } catch (err) {
-      console.error("Error loading chat history:", err);
+      logger.error("Error loading chat history:", err);
       notification.error("No se pudo cargar el historial del chat");
       setChats((prev) =>
         prev.map((c) =>
@@ -156,20 +227,20 @@ export default function OperatorChatPanel() {
     clientUsername: string,
     message: Message,
     clientDbId?: number
-  ) => {
+  ): Promise<number | null> => {
     try {
       // Get client DB ID if not provided
       let dbClientId = clientDbId;
       if (!dbClientId) {
         const client = await getClientByUsernameAction({ username: clientUsername });
         if (!client) {
-          console.warn("Client not found in database:", clientUsername);
-          return;
+          logger.warn("Client not found in database:", clientUsername);
+          return null;
         }
         dbClientId = client.id;
       }
 
-      await saveChatMessageAction({
+      const savedMessage = await saveChatMessageAction({
         clientId: dbClientId,
         clientSocketId: message.from === "client" ? activeClientId ?? null : null,
         senderType: message.from === "client" ? MessageSenderType.CLIENT : MessageSenderType.OPERATOR,
@@ -181,10 +252,21 @@ export default function OperatorChatPanel() {
         mimeType: message.mimeType ?? null,
         sessionId: currentSessionId,
       });
+
+      return savedMessage.id;
     } catch (err) {
-      console.error("Error saving message to database:", err);
+      logger.error("Error saving message to database:", err);
+      return null;
     }
   };
+
+  // Load recent chats on mount
+  useEffect(() => {
+    if (user) {
+      loadRecentChats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://chat-backend-cbla.onrender.com";
@@ -199,7 +281,7 @@ export default function OperatorChatPanel() {
     setConnectionStatus("connecting");
 
     s.on("connect", () => {
-      console.log("✅ Conectado como operador");
+      logger.log("✅ Conectado como operador");
       setConnectionStatus("connected");
       notification.success("Conectado al servidor de chat");
       s.emit("join", {
@@ -210,13 +292,13 @@ export default function OperatorChatPanel() {
     });
 
     s.on("disconnect", () => {
-      console.log("🔌 Desconectado");
+      logger.log("🔌 Desconectado");
       setConnectionStatus("disconnected");
       notification.warning("Desconectado del servidor de chat");
     });
 
     s.on("connect_error", (err) => {
-      console.error("❌ Error de conexión:", err.message);
+      logger.error("❌ Error de conexión:", err.message);
       setConnectionStatus("disconnected");
       notification.error("Error de conexión al servidor de chat");
     });
@@ -258,7 +340,7 @@ export default function OperatorChatPanel() {
           );
         }
       } catch (err) {
-        console.error("Error loading client data:", err);
+        logger.error("Error loading client data:", err);
         setChats((prev) =>
           prev.map((c) =>
             c.clientId === data.clientId ? { ...c, isLoadingHistory: false } : c
@@ -287,8 +369,15 @@ export default function OperatorChatPanel() {
               text: data.message ?? "",
             };
 
-      setChats((prev) => {
-        const updatedChats = prev.map((c) => {
+      // Play sound for incoming message
+      const volume = getEffectiveVolume('info');
+      if (volume > 0) {
+        soundManager.playSound('info', volume);
+      }
+
+      // Add message optimistically
+      setChats((prev) =>
+        prev.map((c) => {
           if (c.clientId !== data.from) return c;
 
           return {
@@ -298,16 +387,30 @@ export default function OperatorChatPanel() {
               activeClientIdRef.current === data.from ? c.unread : c.unread + 1,
             isClientTyping: false,
           };
-        });
+        })
+      );
 
-        // Save to database using the updated chat data
-        const chat = updatedChats.find((c) => c.clientId === data.from);
-        if (chat) {
-          saveMessageToDb(chat.username, newMsg, chat.clientDbId);
+      // Save to database and update with ID
+      const chat = chats.find((c) => c.clientId === data.from);
+      if (chat) {
+        const savedMessageId = await saveMessageToDb(chat.username, newMsg, chat.clientDbId);
+        if (savedMessageId) {
+          setChats((prev) =>
+            prev.map((c) =>
+              c.clientId === data.from
+                ? {
+                    ...c,
+                    messages: c.messages.map((m) =>
+                      m.timestamp === newMsg.timestamp && !m.id
+                        ? { ...m, id: savedMessageId }
+                        : m
+                    ),
+                  }
+                : c
+            )
+          );
         }
-
-        return updatedChats;
-      });
+      }
     });
 
     s.on("clientTyping", (data: TypingPayload) => {
@@ -416,7 +519,7 @@ export default function OperatorChatPanel() {
       setNewClientData({ username: "", phone: "" });
       setClientToCreate(null);
     } catch (err) {
-      console.error("Error creating client:", err);
+      logger.error("Error creating client:", err);
       notification.error("No se pudo guardar el cliente. Verificá que el usuario sea único.");
     }
   };
@@ -484,6 +587,7 @@ export default function OperatorChatPanel() {
       operatorName: user.name,
     });
 
+    // Add message optimistically (without ID)
     setChats((prev) =>
       prev.map((c) =>
         c.clientId === activeChat.clientId
@@ -495,8 +599,24 @@ export default function OperatorChatPanel() {
       ),
     );
 
-    // Save to database
-    await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
+    // Save to database and update with ID
+    const savedMessageId = await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
+    if (savedMessageId) {
+      setChats((prev) =>
+        prev.map((c) =>
+          c.clientId === activeChat.clientId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.timestamp === newMsg.timestamp && m.from === "operator" && !m.id
+                    ? { ...m, id: savedMessageId }
+                    : m
+                ),
+              }
+            : c,
+        ),
+      );
+    }
 
     if (operatorTypingTimeoutRef.current) {
       clearTimeout(operatorTypingTimeoutRef.current);
@@ -554,7 +674,7 @@ export default function OperatorChatPanel() {
         operatorName: user.name,
       });
 
-      // Agregar al chat local
+      // Add message optimistically (without ID)
       setChats((prev) =>
         prev.map((c) =>
           c.clientId === activeChat.clientId
@@ -566,8 +686,24 @@ export default function OperatorChatPanel() {
         ),
       );
 
-      // Save to database
-      await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
+      // Save to database and update with ID
+      const savedMessageId = await saveMessageToDb(activeChat.username, newMsg, activeChat.clientDbId);
+      if (savedMessageId) {
+        setChats((prev) =>
+          prev.map((c) =>
+            c.clientId === activeChat.clientId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.timestamp === newMsg.timestamp && m.from === "operator" && !m.id
+                      ? { ...m, id: savedMessageId }
+                      : m
+                  ),
+                }
+              : c,
+          ),
+        );
+      }
 
       e.target.value = "";
     };
@@ -635,11 +771,16 @@ export default function OperatorChatPanel() {
           </div>
         </div>
 
-        {chats.length === 0 && (
+        {isLoadingChats ? (
+          <p className="p-4 text-neutral-400 text-center text-sm">
+            <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+            Cargando chats...
+          </p>
+        ) : chats.length === 0 ? (
           <p className="p-4 text-neutral-400 text-center text-sm">
             No hay chats activos
           </p>
-        )}
+        ) : null}
 
         <div className="flex-1 overflow-y-auto p-3">
           {chats
@@ -837,14 +978,55 @@ export default function OperatorChatPanel() {
 
                       {m.timestamp && (
                         <span
-                          className={`block text-[11px] mt-2 text-right ${
+                          className={`flex items-center gap-1 justify-end text-[11px] mt-2 ${
                             isOperator ? "text-primary-foreground/90" : "text-neutral-400"
                           }`}
                         >
-                          {new Date(m.timestamp).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          <span>
+                            {new Date(m.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          {isOperator && m.id && (
+                            <svg
+                              className="h-3 w-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              aria-label="Enviado y guardado"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2.5}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          )}
+                          {isOperator && !m.id && (
+                            <svg
+                              className="h-3 w-3 opacity-50 animate-spin"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              aria-label="Enviando..."
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                          )}
                         </span>
                       )}
                     </div>
