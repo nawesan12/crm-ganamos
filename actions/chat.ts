@@ -9,8 +9,10 @@ import { z } from "zod";
  * -------------------------------------- */
 
 const saveChatMessageSchema = z.object({
-  clientId: z.number().int(),
+  clientId: z.number().int().optional().nullable(),
   clientSocketId: z.string().optional().nullable(),
+  guestUsername: z.string().optional().nullable(),
+  guestPhone: z.string().optional().nullable(),
   senderType: z.nativeEnum(MessageSenderType),
   operatorId: z.number().int().optional().nullable(),
   messageType: z.nativeEnum(MessageType),
@@ -26,10 +28,45 @@ export type SaveChatMessageInput = z.infer<typeof saveChatMessageSchema>;
 export async function saveChatMessageAction(input: SaveChatMessageInput) {
   const data = saveChatMessageSchema.parse(input);
 
+  // Auto-create client if guest data provided and no clientId
+  let finalClientId = data.clientId;
+  let finalGuestUsername = data.guestUsername;
+  let finalGuestPhone = data.guestPhone;
+
+  if (!finalClientId && data.guestUsername) {
+    // Check if client already exists with this username
+    const existingClient = await prisma.client.findUnique({
+      where: { username: data.guestUsername },
+    });
+
+    if (existingClient) {
+      // Guest already converted to client
+      finalClientId = existingClient.id;
+      // Clear guest fields since we have a proper client now
+      finalGuestUsername = null;
+      finalGuestPhone = null;
+    } else {
+      // Create new client from guest data
+      const newClient = await prisma.client.create({
+        data: {
+          username: data.guestUsername,
+          phone: data.guestPhone ?? null,
+          status: "ACTIVE",
+        },
+      });
+      finalClientId = newClient.id;
+      // Clear guest fields since we have a proper client now
+      finalGuestUsername = null;
+      finalGuestPhone = null;
+    }
+  }
+
   const message = await prisma.chatMessage.create({
     data: {
-      clientId: data.clientId,
+      clientId: finalClientId ?? null,
       clientSocketId: data.clientSocketId ?? null,
+      guestUsername: finalGuestUsername ?? null,
+      guestPhone: finalGuestPhone ?? null,
       senderType: data.senderType,
       operatorId: data.operatorId ?? null,
       messageType: data.messageType,
@@ -49,7 +86,9 @@ export async function saveChatMessageAction(input: SaveChatMessageInput) {
  * -------------------------------------- */
 
 const getChatHistorySchema = z.object({
-  clientId: z.number().int(),
+  clientId: z.number().int().optional().nullable(),
+  guestUsername: z.string().optional().nullable(),
+  clientSocketId: z.string().optional().nullable(),
   limit: z.number().int().optional().default(100),
   sessionId: z.string().optional().nullable(),
 });
@@ -59,11 +98,22 @@ export type GetChatHistoryInput = z.infer<typeof getChatHistorySchema>;
 export async function getChatHistoryAction(input: GetChatHistoryInput) {
   const data = getChatHistorySchema.parse(input);
 
+  const whereClause: any = {};
+
+  if (data.clientId) {
+    whereClause.clientId = data.clientId;
+  } else if (data.guestUsername) {
+    whereClause.guestUsername = data.guestUsername;
+  } else if (data.clientSocketId) {
+    whereClause.clientSocketId = data.clientSocketId;
+  }
+
+  if (data.sessionId) {
+    whereClause.sessionId = data.sessionId;
+  }
+
   const messages = await prisma.chatMessage.findMany({
-    where: {
-      clientId: data.clientId,
-      ...(data.sessionId ? { sessionId: data.sessionId } : {}),
-    },
+    where: whereClause,
     orderBy: {
       createdAt: "asc",
     },
@@ -124,7 +174,8 @@ export async function getClientByUsernameAction(input: GetClientByUsernameInput)
  * -------------------------------------- */
 
 const markMessagesAsReadSchema = z.object({
-  clientId: z.number().int(),
+  clientId: z.number().int().optional().nullable(),
+  guestUsername: z.string().optional().nullable(),
   operatorId: z.number().int(),
 });
 
@@ -133,12 +184,20 @@ export type MarkMessagesAsReadInput = z.infer<typeof markMessagesAsReadSchema>;
 export async function markMessagesAsReadAction(input: MarkMessagesAsReadInput) {
   const data = markMessagesAsReadSchema.parse(input);
 
+  const whereClause: any = {
+    senderType: MessageSenderType.CLIENT,
+    isRead: false,
+  };
+
+  if (data.clientId) {
+    whereClause.clientId = data.clientId;
+  } else if (data.guestUsername) {
+    whereClause.guestUsername = data.guestUsername;
+    whereClause.clientId = null;
+  }
+
   const result = await prisma.chatMessage.updateMany({
-    where: {
-      clientId: data.clientId,
-      senderType: MessageSenderType.CLIENT,
-      isRead: false,
-    },
+    where: whereClause,
     data: {
       isRead: true,
       readAt: new Date(),
@@ -153,7 +212,8 @@ export async function markMessagesAsReadAction(input: MarkMessagesAsReadInput) {
  * -------------------------------------- */
 
 const getUnreadCountSchema = z.object({
-  clientId: z.number().int(),
+  clientId: z.number().int().optional().nullable(),
+  guestUsername: z.string().optional().nullable(),
 });
 
 export type GetUnreadCountInput = z.infer<typeof getUnreadCountSchema>;
@@ -161,12 +221,20 @@ export type GetUnreadCountInput = z.infer<typeof getUnreadCountSchema>;
 export async function getUnreadCountAction(input: GetUnreadCountInput) {
   const data = getUnreadCountSchema.parse(input);
 
+  const whereClause: any = {
+    senderType: MessageSenderType.CLIENT,
+    isRead: false,
+  };
+
+  if (data.clientId) {
+    whereClause.clientId = data.clientId;
+  } else if (data.guestUsername) {
+    whereClause.guestUsername = data.guestUsername;
+    whereClause.clientId = null;
+  }
+
   const count = await prisma.chatMessage.count({
-    where: {
-      clientId: data.clientId,
-      senderType: MessageSenderType.CLIENT,
-      isRead: false,
-    },
+    where: whereClause,
   });
 
   return count;
@@ -177,7 +245,8 @@ export async function getUnreadCountAction(input: GetUnreadCountInput) {
  * -------------------------------------- */
 
 const searchMessagesSchema = z.object({
-  clientId: z.number().int().optional(),
+  clientId: z.number().int().optional().nullable(),
+  guestUsername: z.string().optional().nullable(),
   searchTerm: z.string().min(1),
   limit: z.number().int().optional().default(50),
 });
@@ -187,24 +256,33 @@ export type SearchMessagesInput = z.infer<typeof searchMessagesSchema>;
 export async function searchMessagesAction(input: SearchMessagesInput) {
   const data = searchMessagesSchema.parse(input);
 
+  const whereClause: any = {
+    OR: [
+      {
+        text: {
+          contains: data.searchTerm,
+          mode: "insensitive",
+        },
+      },
+      {
+        imageName: {
+          contains: data.searchTerm,
+          mode: "insensitive",
+        },
+      },
+    ],
+  };
+
+  // Add client/guest filter if provided
+  if (data.clientId) {
+    whereClause.clientId = data.clientId;
+  } else if (data.guestUsername) {
+    whereClause.guestUsername = data.guestUsername;
+    whereClause.clientId = null;
+  }
+
   const messages = await prisma.chatMessage.findMany({
-    where: {
-      ...(data.clientId ? { clientId: data.clientId } : {}),
-      OR: [
-        {
-          text: {
-            contains: data.searchTerm,
-            mode: "insensitive",
-          },
-        },
-        {
-          imageName: {
-            contains: data.searchTerm,
-            mode: "insensitive",
-          },
-        },
-      ],
-    },
+    where: whereClause,
     orderBy: {
       createdAt: "desc",
     },
@@ -248,8 +326,22 @@ export async function getRecentChatsAction() {
     },
   });
 
+  // Get unique guest usernames from messages without clientId
+  const guestUsernames = await prisma.chatMessage.groupBy({
+    by: ['guestUsername'],
+    where: {
+      clientId: null,
+      guestUsername: {
+        not: null,
+      },
+    },
+    _max: {
+      guestPhone: true,
+    },
+  });
+
   // For each client, get their last message and unread count
-  const chatsWithLastMessage = await Promise.all(
+  const clientChats = await Promise.all(
     clients.map(async (client) => {
       const lastMessage = await prisma.chatMessage.findFirst({
         where: { clientId: client.id },
@@ -276,12 +368,64 @@ export async function getRecentChatsAction() {
         client,
         lastMessage,
         unreadCount,
+        isGuest: false,
       };
     })
   );
 
+  // For each guest username, check if they haven't been converted to a client yet
+  const guestChats = await Promise.all(
+    guestUsernames.map(async (guest) => {
+      if (!guest.guestUsername) return null;
+
+      // Check if this guest was already converted to a client
+      const convertedClient = clients.find(c => c.username === guest.guestUsername);
+      if (convertedClient) {
+        // Skip - this guest is now a proper client and already included above
+        return null;
+      }
+
+      const lastMessage = await prisma.chatMessage.findFirst({
+        where: { guestUsername: guest.guestUsername, clientId: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          text: true,
+          imageUrl: true,
+          messageType: true,
+          senderType: true,
+          createdAt: true,
+        },
+      });
+
+      const unreadCount = await prisma.chatMessage.count({
+        where: {
+          guestUsername: guest.guestUsername,
+          clientId: null,
+          senderType: MessageSenderType.CLIENT,
+          isRead: false,
+        },
+      });
+
+      return {
+        client: {
+          id: 0, // Temporary ID for guests
+          username: guest.guestUsername,
+          phone: guest._max.guestPhone ?? null,
+          status: 'ACTIVE' as const,
+        },
+        lastMessage,
+        unreadCount,
+        isGuest: true,
+      };
+    })
+  );
+
+  // Combine and filter out nulls
+  const allChats = [...clientChats, ...guestChats.filter((chat): chat is NonNullable<typeof chat> => chat !== null)];
+
   // Sort by last message time
-  return chatsWithLastMessage.sort((a, b) => {
+  return allChats.sort((a, b) => {
     const aTime = a.lastMessage?.createdAt?.getTime() ?? 0;
     const bTime = b.lastMessage?.createdAt?.getTime() ?? 0;
     return bTime - aTime;

@@ -83,6 +83,73 @@ function mapUserRoleToLabel(role: UserRole): string {
   }
 }
 
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  const trimmed = password.trim();
+
+  if (!trimmed) {
+    return { valid: false, error: "La contraseña no puede estar vacía" };
+  }
+
+  if (trimmed.length < 6) {
+    return { valid: false, error: "La contraseña debe tener al menos 6 caracteres" };
+  }
+
+  return { valid: true };
+}
+
+function detectUserRoleFromLabel(roleLabel: string): UserRole {
+  const lower = roleLabel.toLowerCase().trim();
+
+  if (lower.includes("admin") || lower.includes("director") || lower.includes("administrador")) {
+    return "ADMIN";
+  } else if (lower.includes("cajero") || lower.includes("cashier")) {
+    return "CASHIER";
+  }
+
+  return "AGENT";
+}
+
+async function checkUsernameAvailable(username: string): Promise<boolean> {
+  const existing = await prisma.user.findUnique({
+    where: { username: username.trim() },
+    select: { id: true },
+  });
+
+  return !existing;
+}
+
+async function createUserInDB(input: {
+  name: string;
+  username: string;
+  passwordHash: string;
+  role: UserRole;
+}): Promise<{
+  id: number;
+  name: string;
+  username: string;
+  role: UserRole;
+  createdAt: Date;
+}> {
+  const dbUser = await prisma.user.create({
+    data: {
+      name: input.name.trim(),
+      username: input.username.trim(),
+      passwordHash: input.passwordHash,
+      role: input.role,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+
+  return dbUser;
+}
+
 // ---- Carga del dashboard ----
 
 export async function getAdminDashboardData(): Promise<{
@@ -374,46 +441,65 @@ export async function addTeamMember(input: {
   roleLabel: string;
   status: TeamMemberStatus;
 }): Promise<TeamMember> {
-  const { name, username, password, roleLabel, status } = input;
+  // Trim inputs first
+  const name = input.name?.trim() || "";
+  const username = input.username?.trim() || "";
+  const password = input.password || "";
+  const roleLabel = input.roleLabel?.trim() || "";
+  const status = input.status;
 
+  // Validate inputs
   if (!name || !username || !password || !roleLabel) {
     throw new Error("Nombre, usuario, contraseña y rol son obligatorios.");
   }
 
-  const lower = roleLabel.toLowerCase();
-  let systemRole: UserRole = "AGENT";
-
-  if (lower.includes("admin") || lower.includes("director")) {
-    systemRole = "ADMIN";
-  } else if (lower.includes("cajero") || lower.includes("cashier")) {
-    systemRole = "CASHIER";
+  // Validate password strength
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    throw new Error(passwordValidation.error);
   }
 
+  // Check if username already exists
+  const isAvailable = await checkUsernameAvailable(username);
+  if (!isAvailable) {
+    throw new Error(`El nombre de usuario "${username}" ya está en uso.`);
+  }
+
+  // Detect role from label
+  const systemRole = detectUserRoleFromLabel(roleLabel);
+
+  // Hash password
   const passwordHash = await hashPassword(password);
 
-  const dbUser = await prisma.user.create({
-    data: {
-      name: name.trim(),
-      username: username.trim(),
+  // Create user in database
+  try {
+    const dbUser = await createUserInDB({
+      name,
+      username,
       passwordHash,
       role: systemRole,
-      isActive: true,
-    },
-  });
+    });
 
-  const now = new Date();
+    const now = new Date();
 
-  const member: TeamMember = {
-    id: `tm-${dbUser.id}`,
-    name: dbUser.name,
-    username: dbUser.username,
-    role: roleLabel.trim() || mapUserRoleToLabel(dbUser.role),
-    status,
-    activeDeals: 0,
-    lastActive: now.toISOString().slice(0, 10),
-  };
+    const member: TeamMember = {
+      id: `tm-${dbUser.id}`,
+      name: dbUser.name,
+      username: dbUser.username,
+      role: roleLabel || mapUserRoleToLabel(dbUser.role),
+      status,
+      activeDeals: 0,
+      lastActive: now.toISOString().slice(0, 10),
+    };
 
-  return member;
+    return member;
+  } catch (error: any) {
+    // Handle unique constraint violation
+    if (error.code === "P2002") {
+      throw new Error(`El nombre de usuario "${username}" ya está en uso.`);
+    }
+    throw error;
+  }
 }
 
 export async function addClientAccount(input: {
@@ -482,45 +568,68 @@ export async function addCashier(input: {
   username: string;
   password: string;
 }): Promise<{ teamMember: TeamMember; cashier: CashierSummary }> {
-  const { name, username, password } = input;
+  // Trim inputs first
+  const name = input.name?.trim() || "";
+  const username = input.username?.trim() || "";
+  const password = input.password || "";
 
+  // Validate inputs
   if (!name || !username || !password) {
     throw new Error("Nombre, usuario y contraseña son obligatorios.");
   }
 
+  // Validate password strength
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    throw new Error(passwordValidation.error);
+  }
+
+  // Check if username already exists
+  const isAvailable = await checkUsernameAvailable(username);
+  if (!isAvailable) {
+    throw new Error(`El nombre de usuario "${username}" ya está en uso.`);
+  }
+
+  // Hash password
   const passwordHash = await hashPassword(password);
 
-  const dbUser = await prisma.user.create({
-    data: {
-      name: name.trim(),
-      username: username.trim(),
+  // Create user in database
+  try {
+    const dbUser = await createUserInDB({
+      name,
+      username,
       passwordHash,
       role: "CASHIER",
-      isActive: true,
-    },
-  });
+    });
 
-  const now = new Date();
+    const now = new Date();
 
-  const teamMember: TeamMember = {
-    id: `tm-${dbUser.id}`,
-    name: dbUser.name,
-    username: dbUser.username,
-    role: mapUserRoleToLabel(dbUser.role),
-    status: "Nuevo ingreso",
-    activeDeals: 0,
-    lastActive: now.toISOString().slice(0, 10),
-  };
+    const teamMember: TeamMember = {
+      id: `tm-${dbUser.id}`,
+      name: dbUser.name,
+      username: dbUser.username,
+      role: mapUserRoleToLabel(dbUser.role),
+      status: "Nuevo ingreso",
+      activeDeals: 0,
+      lastActive: now.toISOString().slice(0, 10),
+    };
 
-  const cashier: CashierSummary = {
-    id: `cash-${dbUser.id}`,
-    name: dbUser.name,
-    username: dbUser.username,
-    totalChargedLast30: 0,
-    chargesLast30: 0,
-    clientsServedLast30: 0,
-    lastChargeAt: undefined,
-  };
+    const cashier: CashierSummary = {
+      id: `cash-${dbUser.id}`,
+      name: dbUser.name,
+      username: dbUser.username,
+      totalChargedLast30: 0,
+      chargesLast30: 0,
+      clientsServedLast30: 0,
+      lastChargeAt: undefined,
+    };
 
-  return { teamMember, cashier };
+    return { teamMember, cashier };
+  } catch (error: any) {
+    // Handle unique constraint violation
+    if (error.code === "P2002") {
+      throw new Error(`El nombre de usuario "${username}" ya está en uso.`);
+    }
+    throw error;
+  }
 }

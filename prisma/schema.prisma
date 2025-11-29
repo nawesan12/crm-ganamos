@@ -105,9 +105,8 @@ enum TransactionType {
 
 enum PaymentMethod {
   CASH
-  DEBIT_CARD
-  CREDIT_CARD
-  BANK_TRANSFER
+  CARD
+  TRANSFER
   OTHER
 }
 
@@ -138,7 +137,8 @@ enum ContactChannel {
   INSTAGRAM
   FACEBOOK
   TIKTOK
-  PHONE_CALL
+  CALL
+  EMAIL
   SMS
   IN_PERSON
   OTHER
@@ -174,10 +174,14 @@ model ChatMessage {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
 
-  // Client involved in this conversation
-  client         Client  @relation(fields: [clientId], references: [id])
-  clientId       Int
+  // Client involved in this conversation (OPTIONAL - can be null for guest users)
+  client         Client? @relation(fields: [clientId], references: [id])
+  clientId       Int?
+
+  // Guest/unregistered user identifiers
   clientSocketId String? // Socket ID for real-time correlation
+  guestUsername  String? // Username for guests not yet in database
+  guestPhone     String? // Phone for guests not yet in database
 
   // Who sent this message
   senderType MessageSenderType // CLIENT or OPERATOR
@@ -201,6 +205,8 @@ model ChatMessage {
   @@index([clientId, createdAt])
   @@index([sessionId, createdAt])
   @@index([operatorId, createdAt])
+  @@index([guestUsername, createdAt])
+  @@index([clientSocketId, createdAt])
 }
 
 enum MessageSenderType {
