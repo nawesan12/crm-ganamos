@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
 import { ArrowLeft, Search, X, Loader2, UserPlus, Download } from "lucide-react";
-import { toast } from "sonner";
+import { useNotification } from "@/lib/useNotification";
 import {
   saveChatMessageAction,
   getChatHistoryAction,
@@ -86,6 +86,7 @@ export default function OperatorChatPanel() {
   const [clientToCreate, setClientToCreate] = useState<string | null>(null);
 
   const user = useAuthStore((state) => state.user);
+  const notification = useNotification();
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -140,7 +141,7 @@ export default function OperatorChatPanel() {
       );
     } catch (err) {
       console.error("Error loading chat history:", err);
-      toast.error("No se pudo cargar el historial del chat");
+      notification.error("No se pudo cargar el historial del chat");
       setChats((prev) =>
         prev.map((c) =>
           c.username === clientUsername
@@ -200,7 +201,7 @@ export default function OperatorChatPanel() {
     s.on("connect", () => {
       console.log("✅ Conectado como operador");
       setConnectionStatus("connected");
-      toast.success("Conectado al servidor de chat");
+      notification.success("Conectado al servidor de chat");
       s.emit("join", {
         role: "operator",
         name: user?.name || "Operador",
@@ -211,13 +212,13 @@ export default function OperatorChatPanel() {
     s.on("disconnect", () => {
       console.log("🔌 Desconectado");
       setConnectionStatus("disconnected");
-      toast.warning("Desconectado del servidor de chat");
+      notification.warning("Desconectado del servidor de chat");
     });
 
     s.on("connect_error", (err) => {
       console.error("❌ Error de conexión:", err.message);
       setConnectionStatus("disconnected");
-      toast.error("Error de conexión al servidor de chat");
+      notification.error("Error de conexión al servidor de chat");
     });
 
     s.on("newChat", async (data: NewChatPayload) => {
@@ -249,7 +250,7 @@ export default function OperatorChatPanel() {
           await loadChatHistory(data.username, client.id);
         } else {
           // Client doesn't exist in database - show notification
-          toast.info(`Nuevo cliente: ${data.username}. Hacé clic en el ícono de usuario para guardar.`);
+          notification.info(`Nuevo cliente: ${data.username}. Hacé clic en el ícono de usuario para guardar.`);
           setChats((prev) =>
             prev.map((c) =>
               c.clientId === data.clientId ? { ...c, isLoadingHistory: false } : c
@@ -354,7 +355,7 @@ export default function OperatorChatPanel() {
       // Show notification if message is for a different chat
       if (activeClientIdRef.current !== data.clientId) {
         const chat = chats.find((c) => c.clientId === data.clientId);
-        toast.info(
+        notification.info(
           `${data.operatorName} envió un mensaje a ${chat?.username || "un cliente"}`
         );
       }
@@ -388,7 +389,7 @@ export default function OperatorChatPanel() {
     e.preventDefault();
 
     if (!newClientData.username.trim()) {
-      toast.error("El nombre de usuario es requerido");
+      notification.error("El nombre de usuario es requerido");
       return;
     }
 
@@ -410,13 +411,13 @@ export default function OperatorChatPanel() {
       // Load history for the newly created client
       await loadChatHistory(client.username, client.id);
 
-      toast.success(`Cliente ${client.username} guardado correctamente`);
+      notification.success(`Cliente ${client.username} guardado correctamente`);
       setIsCreateClientDialogOpen(false);
       setNewClientData({ username: "", phone: "" });
       setClientToCreate(null);
     } catch (err) {
       console.error("Error creating client:", err);
-      toast.error("No se pudo guardar el cliente. Verificá que el usuario sea único.");
+      notification.error("No se pudo guardar el cliente. Verificá que el usuario sea único.");
     }
   };
 

@@ -10,6 +10,7 @@ import type { AuthRole } from "@/types/auth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 type NavItem = {
   label: string;
@@ -125,15 +126,18 @@ export function DashboardNav() {
             </div>
           ) : null}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden text-primary-foreground hover:bg-primary/20 md:inline-flex"
-            onClick={handleLogout}
-          >
-            <LogOut className="size-5" />
-            <span className="sr-only">Cerrar sesión</span>
-          </Button>
+          <div className="hidden items-center gap-2 md:flex">
+            <NotificationSettings />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-primary-foreground hover:bg-primary/20"
+              onClick={handleLogout}
+            >
+              <LogOut className="size-5" />
+              <span className="sr-only">Cerrar sesión</span>
+            </Button>
+          </div>
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
@@ -188,13 +192,19 @@ export function DashboardNav() {
                   </nav>
                 ) : null}
 
-                <Button
-                  variant="outline"
-                  className="justify-start border-primary/30 bg-primary/10 text-foreground hover:bg-primary/20 dark:text-primary-foreground"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="mr-2 size-4" /> Cerrar sesión
-                </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-sm font-medium text-foreground dark:text-primary-foreground">Notificaciones</span>
+                    <NotificationSettings />
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="justify-start border-primary/30 bg-primary/10 text-foreground hover:bg-primary/20 dark:text-primary-foreground"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="mr-2 size-4" /> Cerrar sesión
+                  </Button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>

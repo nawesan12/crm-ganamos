@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { useNotification } from "@/lib/useNotification";
 
 import { MetricCard } from "@/components/dashboard/metric-card";
 import {
@@ -103,6 +103,8 @@ function CrmWorkspaceContent() {
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [isChargeDialogOpen, setIsChargeDialogOpen] = useState(false);
 
+  const notification = useNotification();
+
   useEffect(() => {
     startTransition(() => {
       listClientsAction({ page: 1, pageSize: 50 })
@@ -111,7 +113,7 @@ function CrmWorkspaceContent() {
         })
         .catch((err) => {
           console.error("Error loading clients", err);
-          toast.error("No pudimos cargar los clientes.");
+          notification.error("No pudimos cargar los clientes.");
         });
     });
   }, []);
@@ -137,7 +139,7 @@ function CrmWorkspaceContent() {
     event.preventDefault();
 
     if (!newClient.username.trim()) {
-      toast.error("Ingresá un identificador de cliente.");
+      notification.error("Ingresá un identificador de cliente.");
       return;
     }
 
@@ -168,13 +170,13 @@ function CrmWorkspaceContent() {
           setClients((prev) =>
             prev.map((c) => (c.id === tempClient.id ? client : c))
           );
-          toast.success(`Cliente ${client.username} creado correctamente.`);
+          notification.success(`Cliente ${client.username} creado correctamente.`);
         })
         .catch((err) => {
           console.error("Error creating client", err);
           // Remove the optimistic update on error
           setClients((prev) => prev.filter((c) => c.id !== tempClient.id));
-          toast.error(
+          notification.error(
             "No se pudo crear el cliente. Revisá que el usuario sea único.",
           );
         });
@@ -186,7 +188,7 @@ function CrmWorkspaceContent() {
 
     const clientId = Number.parseInt(contactForm.clientId, 10);
     if (!Number.isFinite(clientId)) {
-      toast.error("Seleccioná un cliente para registrar el contacto.");
+      notification.error("Seleccioná un cliente para registrar el contacto.");
       return;
     }
 
@@ -200,7 +202,7 @@ function CrmWorkspaceContent() {
         message: contactForm.message.trim() || undefined,
       })
         .then(() => {
-          toast.success("Contacto registrado correctamente.");
+          notification.success("Contacto registrado correctamente.");
           setContactForm((prev) => ({
             ...prev,
             message: "",
@@ -209,7 +211,7 @@ function CrmWorkspaceContent() {
         })
         .catch((err) => {
           console.error("Error logging contact", err);
-          toast.error("No se pudo registrar el contacto.");
+          notification.error("No se pudo registrar el contacto.");
         });
     });
   };
@@ -221,12 +223,12 @@ function CrmWorkspaceContent() {
     const amount = Number.parseInt(chargeForm.amount, 10);
 
     if (!Number.isFinite(clientId)) {
-      toast.error("Seleccioná un cliente para acreditar puntos.");
+      notification.error("Seleccioná un cliente para acreditar puntos.");
       return;
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Ingresá un monto válido de puntos.");
+      notification.error("Ingresá un monto válido de puntos.");
       return;
     }
 
@@ -268,7 +270,7 @@ function CrmWorkspaceContent() {
                 : item,
             ),
           );
-          toast.success("Carga registrada y saldo actualizado.");
+          notification.success("Carga registrada y saldo actualizado.");
         })
         .catch((err) => {
           console.error("Error registering charge", err);
@@ -281,7 +283,7 @@ function CrmWorkspaceContent() {
             ),
           );
           setChargeForm(formBackup);
-          toast.error("No se pudo registrar la carga.");
+          notification.error("No se pudo registrar la carga.");
         });
     });
   };
