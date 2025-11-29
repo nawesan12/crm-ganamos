@@ -112,24 +112,35 @@ export default function OperatorChatPanel() {
 
     // Mark messages as read when switching to a chat
     if (activeClientId && user) {
-      const chat = chats.find((c) => c.clientId === activeClientId);
-      if (chat && chat.clientDbId && chat.unread > 0) {
-        markMessagesAsReadAction({
-          clientId: chat.clientDbId,
-          operatorId: user.id,
-        }).then(() => {
-          // Update unread count in local state
-          setChats((prev) =>
-            prev.map((c) =>
-              c.clientId === activeClientId ? { ...c, unread: 0 } : c
-            )
-          );
-        }).catch((err) => {
-          logger.error("Error marking messages as read:", err);
-        });
-      }
+      logger.log(`🔵 Switched to chat: ${activeClientId}`);
+
+      // Use functional update to get current chats without adding to dependencies
+      setChats((prev) => {
+        const chat = prev.find((c) => c.clientId === activeClientId);
+
+        if (chat && chat.clientDbId && chat.unread > 0) {
+          logger.log(`📖 Marking ${chat.unread} messages as read for ${chat.username}`);
+
+          markMessagesAsReadAction({
+            clientId: chat.clientDbId,
+            operatorId: user.id,
+          }).then(() => {
+            logger.log(`✅ Successfully marked messages as read`);
+            // Update unread count in local state
+            setChats((prevChats) =>
+              prevChats.map((c) =>
+                c.clientId === activeClientId ? { ...c, unread: 0 } : c
+              )
+            );
+          }).catch((err) => {
+            logger.error("Error marking messages as read:", err);
+          });
+        }
+
+        return prev; // Don't modify chats in this update
+      });
     }
-  }, [activeClientId, user, chats]);
+  }, [activeClientId, user]); // Remove 'chats' from dependencies!
 
   const operatorTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -359,9 +370,26 @@ export default function OperatorChatPanel() {
     });
 
     s.on("newChat", async (data: NewChatPayload) => {
+      logger.log("🆕 New chat event received:", {
+        clientId: data.clientId,
+        username: data.username,
+      });
+
       setChats((prev) => {
         const exists = prev.some((c) => c.clientId === data.clientId);
-        if (exists) return prev;
+        const existsByUsername = prev.some((c) => c.username === data.username);
+
+        logger.log("Checking for duplicates:", {
+          existsByClientId: exists,
+          existsByUsername: existsByUsername,
+          currentChats: prev.map(c => ({ clientId: c.clientId, username: c.username }))
+        });
+
+        // Prevent duplicate by checking BOTH clientId and username
+        if (exists || existsByUsername) {
+          logger.log("⏭️ Skipping duplicate chat");
+          return prev;
+        }
 
         const updated = [
           ...prev,
@@ -621,9 +649,8 @@ export default function OperatorChatPanel() {
 
   const handleSelectChat = (clientId: string) => {
     setActiveClientId(clientId);
-    setChats((prev) =>
-      prev.map((c) => (c.clientId === clientId ? { ...c, unread: 0 } : c)),
-    );
+    // Don't set unread to 0 here - let the useEffect handle it after DB update
+    // This prevents phantom notifications if the DB update fails
   };
 
   const handleOpenCreateClientDialog = (username: string) => {
