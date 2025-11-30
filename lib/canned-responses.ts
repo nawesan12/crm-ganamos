@@ -183,3 +183,58 @@ export const searchResponses = (query: string): CannedResponse[] => {
 export const getResponseByCommand = (command: string): CannedResponse | undefined => {
   return cannedResponses.find((r) => r.command === command);
 };
+
+// Keyword mapping for smart suggestions
+const keywordMapping: Record<string, string[]> = {
+  "/horarios": ["horario", "hora", "abierto", "cerrado", "atienden", "abren", "cierran", "cuando abren"],
+  "/precio": ["precio", "cuesta", "cuánto", "cuanto", "vale", "valor", "costar"],
+  "/descuento": ["descuento", "oferta", "promo", "promoción", "promocion", "rebaja", "barato"],
+  "/cotizacion": ["cotización", "cotizacion", "presupuesto", "cotizar"],
+  "/envio": ["envío", "envio", "entregar", "delivery", "despacho", "entrega"],
+  "/costoenvio": ["costo de envío", "costo de envio", "cuánto sale envío", "cuanto sale envio", "precio envío", "precio envio"],
+  "/seguimiento": ["rastrear", "seguimiento", "tracking", "dónde está", "donde esta", "track", "pedido"],
+  "/pago": ["pago", "pagar", "forma de pago", "método de pago", "metodo de pago", "cómo pago", "como pago"],
+  "/cuotas": ["cuotas", "financiación", "financiacion", "tarjeta", "crédito", "credito", "plazo"],
+  "/factura": ["factura", "comprobante", "recibo", "ticket"],
+  "/garantia": ["garantía", "garantia", "cobertura"],
+  "/devolucion": ["devolución", "devolucion", "devolver", "reembolso"],
+  "/cambio": ["cambio", "cambiar", "reemplazar"],
+  "/catalogo": ["catálogo", "catalogo", "productos", "que venden", "qué venden", "lista"],
+  "/stock": ["stock", "hay", "disponible", "tienen", "disponibilidad", "quedan"],
+  "/contacto": ["contacto", "teléfono", "telefono", "dirección", "direccion", "email", "mail", "ubicación", "ubicacion"],
+  "/bienvenida": ["hola", "buenos días", "buenos dias", "buenas tardes", "buenas noches", "buen día", "buen dia", "saludos"],
+  "/gracias": ["gracias", "thank you", "agradezco", "muchas gracias"],
+  "/soporte": ["soporte", "ayuda", "problema", "falla", "error", "no funciona", "roto", "defecto"],
+  "/reclamo": ["reclamo", "queja", "disconforme", "mal servicio", "mala atención", "mala atencion"],
+  "/espera": ["espera", "momento", "un segundo"],
+};
+
+// Smart suggestion based on customer message keywords
+export const getSuggestedResponses = (message: string): CannedResponse[] => {
+  const lowerMessage = message.toLowerCase();
+  const suggestions: { response: CannedResponse; score: number }[] = [];
+
+  // Check each command's keywords
+  Object.entries(keywordMapping).forEach(([command, keywords]) => {
+    let score = 0;
+    keywords.forEach((keyword) => {
+      if (lowerMessage.includes(keyword)) {
+        // Longer keyword matches get higher scores
+        score += keyword.length;
+      }
+    });
+
+    if (score > 0) {
+      const response = getResponseByCommand(command);
+      if (response) {
+        suggestions.push({ response, score });
+      }
+    }
+  });
+
+  // Sort by score (highest first) and return top 3
+  return suggestions
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((s) => s.response);
+};

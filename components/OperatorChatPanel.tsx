@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
-import { ArrowLeft, Search, X, Loader2, UserPlus, Download, Sun, Moon, Zap } from "lucide-react";
+import { ArrowLeft, Search, X, Loader2, UserPlus, Download, Sun, Moon, Zap, Smile } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useNotification } from "@/lib/useNotification";
 import { soundManager } from "@/lib/sound-notifications";
@@ -98,6 +98,7 @@ export default function OperatorChatPanel() {
   const [showCannedResponses, setShowCannedResponses] = useState(false);
   const [cannedSearchQuery, setCannedSearchQuery] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const user = useAuthStore((state) => state.user);
   const notification = useNotification();
@@ -205,7 +206,6 @@ export default function OperatorChatPanel() {
           icon: icon || "/favicon.ico",
           badge: "/favicon.ico",
           tag: "chat-message",
-          renotify: true,
         });
 
         notif.onclick = () => {
@@ -229,7 +229,16 @@ export default function OperatorChatPanel() {
       if (modifier && e.key === 'k') {
         e.preventDefault();
         setShowCannedResponses(prev => !prev);
+        setShowEmojiPicker(false); // Close emoji picker
         notification.info("Respuestas rápidas " + (showCannedResponses ? "cerradas" : "abiertas"));
+      }
+
+      // Ctrl/Cmd + E: Open emoji picker
+      if (modifier && e.key === 'e') {
+        e.preventDefault();
+        setShowEmojiPicker(prev => !prev);
+        setShowCannedResponses(false); // Close canned responses
+        notification.info("Selector de emojis " + (showEmojiPicker ? "cerrado" : "abierto"));
       }
 
       // Ctrl/Cmd + Enter: Send message (if input has focus)
@@ -255,19 +264,20 @@ export default function OperatorChatPanel() {
       if (modifier && e.key === '/') {
         e.preventDefault();
         notification.info(
-          "Atajos: Ctrl/Cmd+K (respuestas), Ctrl/Cmd+Enter (enviar), Ctrl/Cmd+1-9 (cambiar chat), Esc (cerrar menús)"
+          "Atajos: Ctrl/Cmd+K (respuestas), Ctrl/Cmd+E (emojis), Ctrl/Cmd+Enter (enviar), Ctrl/Cmd+1-9 (cambiar chat), Esc (cerrar menús)"
         );
       }
 
-      // Esc: Close quick replies menu
+      // Esc: Close quick replies menu and emoji picker
       if (e.key === 'Escape') {
         setShowCannedResponses(false);
+        setShowEmojiPicker(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [chats, input, showCannedResponses, notification]);
+  }, [chats, input, showCannedResponses, showEmojiPicker, notification]);
 
   // ---------------- DATABASE HELPER FUNCTIONS ----------------
 
@@ -1585,6 +1595,88 @@ export default function OperatorChatPanel() {
                 className="hidden"
                 onChange={handleFileChange}
               />
+
+              {/* 🆕 Botón emoji picker */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 flex items-center justify-center hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-all flex-shrink-0"
+                  title="Emojis (Ctrl+E)"
+                >
+                  <Smile className="h-5 w-5 text-primary" />
+                </button>
+
+                {/* Emoji Picker Menu */}
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full left-0 mb-2 w-80 max-h-96 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    <div className="p-3 border-b border-neutral-200 dark:border-neutral-700">
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                        Seleccionar Emoji
+                      </h3>
+                    </div>
+                    <div className="overflow-y-auto max-h-80 p-3">
+                      {/* Categorías de emojis */}
+                      {[
+                        {
+                          name: "😀 Emociones",
+                          emojis: ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "🤐", "🤨", "😐", "😑", "😶", "😏", "😒", "🙄", "😬", "🤥", "😌", "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "🥵", "🥶", "😎", "🤓", "🧐", "😕", "😟", "🙁", "☹️", "😮", "😯", "😲", "😳", "🥺", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡", "😠", "🤬", "😈", "👿", "💀", "☠️"],
+                        },
+                        {
+                          name: "👋 Gestos",
+                          emojis: ["👋", "🤚", "🖐", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏"],
+                        },
+                        {
+                          name: "❤️ Corazones",
+                          emojis: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟"],
+                        },
+                        {
+                          name: "🎉 Celebración",
+                          emojis: ["🎉", "🎊", "🎁", "🎈", "🎂", "🎀", "🎆", "🎇", "✨", "🎄", "🎃", "🎗", "🥇", "🥈", "🥉", "🏆", "🏅", "🎖"],
+                        },
+                        {
+                          name: "🔥 Popular",
+                          emojis: ["🔥", "💯", "⭐", "🌟", "✨", "⚡", "💥", "💫", "💢", "💬", "💭", "🗯", "💤", "👀", "👁", "🧠", "🫀", "🫁"],
+                        },
+                        {
+                          name: "💼 Trabajo",
+                          emojis: ["💼", "📊", "📈", "📉", "💰", "💵", "💴", "💶", "💷", "💳", "💸", "🏦", "🏪", "🏬", "🏢", "🏛", "⏰", "⏱", "⏲", "📅", "📆", "🗓", "📋", "📌", "📍", "✅", "❌", "⚠️"],
+                        },
+                        {
+                          name: "🍕 Comida",
+                          emojis: ["🍕", "🍔", "🍟", "🌭", "🥪", "🌮", "🌯", "🥙", "🍿", "🧂", "🥚", "🍳", "🧇", "🥞", "🧈", "🍞", "🥐", "🥨", "🥯", "🧀", "🍗", "🍖", "🦴", "🌶", "🥓", "🍕", "🍝", "🥗", "🍲", "🍱", "🍛", "🍜", "🍣", "🍤", "🥟", "🦪", "🍦", "🍨", "🍧", "🍰", "🎂", "🧁", "🍮", "🍩", "🍪", "🍫", "🍬", "🍭", "🍯"],
+                        },
+                        {
+                          name: "⚽ Deportes",
+                          emojis: ["⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🪀", "🏓", "🏸", "🏒", "🏑", "🥍", "🏏", "⛳", "🪁", "🏹", "🎣", "🤿", "🥊", "🥋", "🎽", "🛹", "🛼", "⛸", "🥌"],
+                        },
+                      ].map((category, idx) => (
+                        <div key={idx} className="mb-4">
+                          <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-2">
+                            {category.name}
+                          </div>
+                          <div className="grid grid-cols-8 gap-1">
+                            {category.emojis.map((emoji, emojiIdx) => (
+                              <button
+                                key={emojiIdx}
+                                type="button"
+                                onClick={() => {
+                                  setInput(prev => prev + emoji);
+                                  setShowEmojiPicker(false);
+                                }}
+                                className="text-2xl hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded p-1 transition-colors"
+                                title={emoji}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <input
                 className="flex-1 p-3 md:p-4 outline-none text-sm md:text-base text-neutral-800 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-700 rounded-xl border border-neutral-200 dark:border-neutral-600 transition-all focus:bg-white dark:focus:bg-neutral-800 focus:ring-2 focus:ring-primary placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
