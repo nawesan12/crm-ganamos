@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
-import { ArrowLeft, Search, X, Loader2, UserPlus, Download, Sun, Moon } from "lucide-react";
+import { ArrowLeft, Search, X, Loader2, UserPlus, Download, Sun, Moon, Zap } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useNotification } from "@/lib/useNotification";
 import { soundManager } from "@/lib/sound-notifications";
 import { useNotificationSettings } from "@/stores/notification-settings-store";
 import { logger } from "@/lib/logger";
+import { cannedResponses, getCategories, type CannedResponse } from "@/lib/canned-responses";
 import {
   saveChatMessageAction,
   getChatHistoryAction,
@@ -36,6 +37,8 @@ interface Message {
   isRead?: boolean;
   operatorId?: number; // ID of operator who sent the message
   operatorName?: string; // Name of operator who sent the message
+  messageId?: string; // Socket message ID for delivery tracking
+  deliveryStatus?: "sent" | "delivered" | "read"; // Delivery status
 }
 
 interface Chat {
@@ -91,6 +94,10 @@ export default function OperatorChatPanel() {
   const [newClientData, setNewClientData] = useState({ username: "", phone: "" });
   const [clientToCreate, setClientToCreate] = useState<string | null>(null);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [operatorStatus, setOperatorStatus] = useState<"online" | "away" | "busy" | "offline">("online");
+  const [showCannedResponses, setShowCannedResponses] = useState(false);
+  const [cannedSearchQuery, setCannedSearchQuery] = useState("");
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
 
   const user = useAuthStore((state) => state.user);
   const notification = useNotification();
@@ -159,6 +166,108 @@ export default function OperatorChatPanel() {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [activeChat?.messages.length]);
+
+  // ---------------- BROWSER NOTIFICATIONS & TAB TITLE ----------------
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission);
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then((permission) => {
+          setNotificationPermission(permission);
+        });
+      }
+    }
+  }, []);
+
+  // Update browser tab title with unread count
+  useEffect(() => {
+    const totalUnread = chats.reduce((sum, chat) => sum + chat.unread, 0);
+
+    if (totalUnread > 0) {
+      document.title = `(${totalUnread}) Operator Chat`;
+    } else {
+      document.title = "Operator Chat";
+    }
+
+    return () => {
+      document.title = "Operator Chat";
+    };
+  }, [chats]);
+
+  // Show browser notification for new messages
+  const showBrowserNotification = (title: string, body: string, icon?: string) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      // Only show if tab is not focused
+      if (document.hidden) {
+        const notif = new Notification(title, {
+          body,
+          icon: icon || "/favicon.ico",
+          badge: "/favicon.ico",
+          tag: "chat-message",
+          renotify: true,
+        });
+
+        notif.onclick = () => {
+          window.focus();
+          notif.close();
+        };
+
+        // Auto-close after 5 seconds
+        setTimeout(() => notif.close(), 5000);
+      }
+    }
+  };
+
+  // ---------------- KEYBOARD SHORTCUTS ----------------
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      // Ctrl/Cmd + K: Open quick replies
+      if (modifier && e.key === 'k') {
+        e.preventDefault();
+        setShowCannedResponses(prev => !prev);
+        notification.info("Respuestas rápidas " + (showCannedResponses ? "cerradas" : "abiertas"));
+      }
+
+      // Ctrl/Cmd + Enter: Send message (if input has focus)
+      if (modifier && e.key === 'Enter') {
+        e.preventDefault();
+        const form = document.querySelector('form') as HTMLFormElement;
+        if (form && input.trim()) {
+          form.requestSubmit();
+        }
+      }
+
+      // Ctrl/Cmd + 1-9: Switch to chat 1-9
+      if (modifier && e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        const index = parseInt(e.key) - 1;
+        if (chats[index]) {
+          handleSelectChat(chats[index].clientId);
+          notification.info(`Cambiado a chat ${e.key}`);
+        }
+      }
+
+      // Ctrl/Cmd + /: Show shortcuts help
+      if (modifier && e.key === '/') {
+        e.preventDefault();
+        notification.info(
+          "Atajos: Ctrl/Cmd+K (respuestas), Ctrl/Cmd+Enter (enviar), Ctrl/Cmd+1-9 (cambiar chat), Esc (cerrar menús)"
+        );
+      }
+
+      // Esc: Close quick replies menu
+      if (e.key === 'Escape') {
+        setShowCannedResponses(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [chats, input, showCannedResponses, notification]);
 
   // ---------------- DATABASE HELPER FUNCTIONS ----------------
 
@@ -343,6 +452,11 @@ export default function OperatorChatPanel() {
     const s = io(socketUrl, {
       path: socketPath,
       transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
 
     socketRef.current = s;
@@ -369,6 +483,23 @@ export default function OperatorChatPanel() {
       logger.error("❌ Error de conexión:", err.message);
       setConnectionStatus("disconnected");
       notification.error("Error de conexión al servidor de chat");
+    });
+
+    s.on("reconnect_attempt", (attempt) => {
+      logger.log(`♻️ Intentando reconectar, intento #${attempt}`);
+      setConnectionStatus("connecting");
+    });
+
+    s.on("reconnect", (attempt) => {
+      logger.log(`✅ Reconexión exitosa después de ${attempt} intentos`);
+      setConnectionStatus("connected");
+      notification.success("Reconectado al servidor de chat");
+    });
+
+    s.on("reconnect_failed", () => {
+      logger.error("❌ Falló la reconexión");
+      setConnectionStatus("disconnected");
+      notification.error("No se pudo reconectar al servidor de chat");
     });
 
     s.on("newChat", async (data: NewChatPayload) => {
@@ -469,6 +600,18 @@ export default function OperatorChatPanel() {
 
       // Find chat BEFORE state update to get current data
       const existingChat = chats.find((c) => c.clientId === data.from);
+
+      // Show browser notification
+      if (existingChat) {
+        const messagePreview = data.type === "image"
+          ? "📷 Imagen"
+          : (data.message?.substring(0, 50) || "Nuevo mensaje");
+
+        showBrowserNotification(
+          `Nuevo mensaje de ${existingChat.username}`,
+          messagePreview
+        );
+      }
 
       if (!existingChat) {
         logger.warn("⚠️ Chat not found for incoming message:", {
@@ -638,6 +781,82 @@ export default function OperatorChatPanel() {
       }
     });
 
+    // Message sent confirmation from backend
+    s.on("messageSent", (data: { messageId: string; clientId: string; timestamp: string; queued: boolean }) => {
+      logger.log("📤 Message sent confirmation:", data);
+      // Update the last message with the backend-generated messageId
+      setChats((prev) =>
+        prev.map((chat) => {
+          if (chat.clientId === data.clientId) {
+            const lastMsg = chat.messages[chat.messages.length - 1];
+            if (lastMsg && lastMsg.from === "operator" && !lastMsg.messageId) {
+              return {
+                ...chat,
+                messages: chat.messages.map((msg, idx) =>
+                  idx === chat.messages.length - 1
+                    ? { ...msg, messageId: data.messageId, deliveryStatus: data.queued ? "sent" as const : "delivered" as const }
+                    : msg
+                ),
+              };
+            }
+          }
+          return chat;
+        })
+      );
+    });
+
+    // Message delivered confirmation
+    s.on("messageDelivered", (data: { messageId: string; clientId: string; timestamp: string }) => {
+      logger.log("✅ Message delivered:", data);
+      setChats((prev) =>
+        prev.map((chat) => {
+          if (chat.clientId === data.clientId) {
+            return {
+              ...chat,
+              messages: chat.messages.map((msg) =>
+                msg.messageId === data.messageId
+                  ? { ...msg, deliveryStatus: "delivered" as const }
+                  : msg
+              ),
+            };
+          }
+          return chat;
+        })
+      );
+    });
+
+    // Message read confirmation
+    s.on("messageRead", (data: { messageId: string; clientId: string; timestamp: string }) => {
+      logger.log("📖 Message read:", data);
+      setChats((prev) =>
+        prev.map((chat) => {
+          if (chat.clientId === data.clientId) {
+            return {
+              ...chat,
+              messages: chat.messages.map((msg) =>
+                msg.messageId === data.messageId
+                  ? { ...msg, deliveryStatus: "read" as const }
+                  : msg
+              ),
+            };
+          }
+          return chat;
+        })
+      );
+    });
+
+    // Message queued notification (client offline)
+    s.on("messageQueued", (data: { messageId: string; clientId: string; reason: string }) => {
+      logger.log("📤 Message queued:", data);
+      notification.warning(`Mensaje en cola: ${data.reason}`);
+    });
+
+    // Operator status changed
+    s.on("operatorStatusChanged", (data: { operatorId: number; operatorName: string; status: string }) => {
+      logger.log("👤 Operator status changed:", data);
+      notification.info(`${data.operatorName} está ${data.status}`);
+    });
+
     return () => {
       s.removeAllListeners();
       s.disconnect();
@@ -706,6 +925,22 @@ export default function OperatorChatPanel() {
     document.body.removeChild(link);
   };
 
+  const changeOperatorStatus = (newStatus: "online" | "away" | "busy" | "offline") => {
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    setOperatorStatus(newStatus);
+    socket.emit("operatorStatusChange", { status: newStatus });
+
+    const statusText = {
+      online: "disponible",
+      away: "ausente",
+      busy: "ocupado",
+      offline: "desconectado"
+    };
+    notification.success(`Tu estado cambió a: ${statusText[newStatus]}`);
+  };
+
   const notifyOperatorTyping = (isTyping: boolean) => {
     const socket = socketRef.current;
     const currentClientId = activeClientIdRef.current;
@@ -750,6 +985,7 @@ export default function OperatorChatPanel() {
       timestamp: new Date().toISOString(),
       operatorId: user.id,
       operatorName: user.name,
+      deliveryStatus: "sent",
     };
 
     // Add message optimistically (without ID)
@@ -938,6 +1174,21 @@ export default function OperatorChatPanel() {
                 <span className={`h-2 w-2 rounded-full ${statusDotClass} animate-pulse`} />
                 <span>{statusLabel}</span>
               </div>
+            </div>
+          </div>
+          <div className="px-6 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">Tu estado:</span>
+              <select
+                value={operatorStatus}
+                onChange={(e) => changeOperatorStatus(e.target.value as "online" | "away" | "busy" | "offline")}
+                className="flex-1 text-xs px-2 py-1.5 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              >
+                <option value="online">🟢 Disponible</option>
+                <option value="away">🟡 Ausente</option>
+                <option value="busy">🔴 Ocupado</option>
+                <option value="offline">⚫ Desconectado</option>
+              </select>
             </div>
           </div>
           <div className="px-6 pb-2">
@@ -1202,23 +1453,17 @@ export default function OperatorChatPanel() {
                               minute: "2-digit",
                             })}
                           </span>
-                          {isOperator && m.id && (
-                            <svg
-                              className="h-3 w-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              aria-label="Enviado y guardado"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2.5}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
+                          {/* Delivery status indicators */}
+                          {isOperator && m.deliveryStatus === "read" && (
+                            <span className="text-xs text-blue-400" title="Leído">✓✓</span>
                           )}
-                          {isOperator && !m.id && (
+                          {isOperator && m.deliveryStatus === "delivered" && (
+                            <span className="text-xs opacity-70" title="Entregado">✓✓</span>
+                          )}
+                          {isOperator && m.deliveryStatus === "sent" && m.id && (
+                            <span className="text-xs opacity-60" title="Enviado">✓</span>
+                          )}
+                          {isOperator && !m.deliveryStatus && !m.id && (
                             <svg
                               className="h-3 w-3 opacity-50 animate-spin"
                               fill="none"
@@ -1262,6 +1507,66 @@ export default function OperatorChatPanel() {
               onSubmit={sendMessage}
               className="flex items-center gap-2 md:gap-3 border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-3 md:p-4"
             >
+              {/* 🆕 Botón respuestas rápidas */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowCannedResponses(!showCannedResponses)}
+                  className="h-10 w-10 md:h-12 md:w-12 rounded-xl bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 flex items-center justify-center hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-all flex-shrink-0"
+                  title="Respuestas rápidas"
+                >
+                  <Zap className="h-5 w-5 text-primary" />
+                </button>
+
+                {/* Canned Responses Menu */}
+                {showCannedResponses && (
+                  <div className="absolute bottom-full left-0 mb-2 w-80 max-h-96 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                    <div className="p-3 border-b border-neutral-200 dark:border-neutral-700">
+                      <input
+                        type="text"
+                        placeholder="Buscar respuestas..."
+                        value={cannedSearchQuery}
+                        onChange={(e) => setCannedSearchQuery(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                    </div>
+                    <div className="overflow-y-auto max-h-80">
+                      {cannedResponses
+                        .filter((r) =>
+                          cannedSearchQuery
+                            ? r.label.toLowerCase().includes(cannedSearchQuery.toLowerCase()) ||
+                              r.command.toLowerCase().includes(cannedSearchQuery.toLowerCase())
+                            : true
+                        )
+                        .map((response) => (
+                          <button
+                            key={response.command}
+                            type="button"
+                            onClick={() => {
+                              setInput(response.message);
+                              setShowCannedResponses(false);
+                              setCannedSearchQuery("");
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-700 border-b border-neutral-100 dark:border-neutral-700 last:border-b-0 transition-colors"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                                {response.label}
+                              </span>
+                              <span className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+                                {response.command}
+                              </span>
+                            </div>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">
+                              {response.message}
+                            </p>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* 🆕 Botón imagen */}
               <button
                 type="button"
