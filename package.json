@@ -11,7 +11,8 @@
     "postinstall": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:status": "prisma migrate status",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "cleanup:chats": "bun run scripts/cleanup-duplicate-chats.ts"
   },
   "dependencies": {
     "@prisma/client": "6.0.1",

@@ -422,8 +422,17 @@ export default function OperatorChatPanel() {
         tags: chatTags[chat.clientId] || []
       }));
 
-      setChats(chatsWithTags);
-      logger.log(`✅ Successfully loaded ${chatsData.length} chats from database`);
+      // Filter out any duplicates by clientId (keep the first occurrence)
+      const uniqueChats = chatsWithTags.filter((chat, index, self) =>
+        index === self.findIndex((c) => c.clientId === chat.clientId)
+      );
+
+      if (uniqueChats.length < chatsWithTags.length) {
+        logger.warn(`⚠️ Filtered out ${chatsWithTags.length - uniqueChats.length} duplicate chats`);
+      }
+
+      setChats(uniqueChats);
+      logger.log(`✅ Successfully loaded ${uniqueChats.length} chats from database`);
     } catch (err: any) {
       logger.error("❌ Error loading recent chats:", err);
       logger.error("Error details:", {
@@ -588,18 +597,21 @@ export default function OperatorChatPanel() {
       });
 
       setChats((prev) => {
-        const exists = prev.some((c) => c.clientId === data.clientId);
+        // Primary check: by clientId (socket ID)
+        const existsByClientId = prev.some((c) => c.clientId === data.clientId);
+
+        // Secondary check: by username (prevents duplicates if client reconnects)
         const existsByUsername = prev.some((c) => c.username === data.username);
 
         logger.log("Checking for duplicates:", {
-          existsByClientId: exists,
-          existsByUsername: existsByUsername,
+          existsByClientId,
+          existsByUsername,
           currentChats: prev.map(c => ({ clientId: c.clientId, username: c.username }))
         });
 
         // Prevent duplicate by checking BOTH clientId and username
-        if (exists || existsByUsername) {
-          logger.log("⏭️ Skipping duplicate chat");
+        if (existsByClientId || existsByUsername) {
+          logger.log("⏭️ Skipping duplicate chat - already exists");
           return prev;
         }
 
@@ -1362,13 +1374,26 @@ export default function OperatorChatPanel() {
         ) : null}
 
         <div className="flex-1 overflow-y-auto p-3">
-          {chats
-            .filter((c) =>
+          {(() => {
+            const filteredChats = chats.filter((c) =>
               searchQuery
                 ? c.username.toLowerCase().includes(searchQuery.toLowerCase())
                 : true
-            )
-            .sort((a, b) => {
+            );
+
+            // DEBUG: Log all clientIds to check for duplicates
+            const clientIds = filteredChats.map(c => c.clientId);
+            const uniqueClientIds = [...new Set(clientIds)];
+            if (clientIds.length !== uniqueClientIds.length) {
+              console.error('🚨 DUPLICATE CLIENT IDS DETECTED:', {
+                total: clientIds.length,
+                unique: uniqueClientIds.length,
+                duplicates: clientIds.filter((id, idx) => clientIds.indexOf(id) !== idx),
+                allChats: filteredChats.map(c => ({ clientId: c.clientId, username: c.username }))
+              });
+            }
+
+            return filteredChats.sort((a, b) => {
               // Get the timestamp of the last message for each chat
               const aLastMessage = a.messages[a.messages.length - 1];
               const bLastMessage = b.messages[b.messages.length - 1];
@@ -1481,7 +1506,8 @@ export default function OperatorChatPanel() {
                 )}
               </button>
             );
-          })}
+          });
+          })()}
         </div>
       </aside>
 

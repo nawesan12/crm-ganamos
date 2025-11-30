@@ -412,9 +412,17 @@ export async function getRecentChatsAction() {
           },
         });
 
+        // For guests, use a negative hash of the username as a unique ID
+        // This ensures each guest gets a unique ID that's consistent across sessions
+        const guestId = -Math.abs(
+          guest.guestUsername.split('').reduce((acc, char) => {
+            return acc * 31 + char.charCodeAt(0);
+          }, 0) % 1000000
+        );
+
         return {
           client: {
-            id: 0, // Temporary ID for guests
+            id: guestId, // Unique negative ID for guests based on username hash
             username: guest.guestUsername,
             phone: guest._max.guestPhone ?? null,
             status: 'ACTIVE' as const,
