@@ -41,6 +41,8 @@ interface Message {
   deliveryStatus?: "sent" | "delivered" | "read"; // Delivery status
 }
 
+type ChatTag = "sales" | "support" | "vip" | "urgent" | "followup" | "resolved";
+
 interface Chat {
   clientId: string;
   username: string;
@@ -49,6 +51,7 @@ interface Chat {
   isClientTyping?: boolean;
   clientDbId?: number; // Database client ID
   isLoadingHistory?: boolean;
+  tags?: ChatTag[]; // Tags for categorizing chats
 }
 
 interface NewChatPayload {
@@ -78,6 +81,47 @@ interface OperatorMessageBroadcast {
   operatorName: string; // Name of the operator who sent it
 }
 
+// ---------------- TAG CONFIGURATION ----------------
+
+const TAG_CONFIG: Record<ChatTag, { label: string; color: string; bgColor: string; icon: string }> = {
+  sales: {
+    label: "Ventas",
+    color: "text-green-700 dark:text-green-400",
+    bgColor: "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700",
+    icon: "💰"
+  },
+  support: {
+    label: "Soporte",
+    color: "text-blue-700 dark:text-blue-400",
+    bgColor: "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700",
+    icon: "🛠️"
+  },
+  vip: {
+    label: "VIP",
+    color: "text-purple-700 dark:text-purple-400",
+    bgColor: "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700",
+    icon: "⭐"
+  },
+  urgent: {
+    label: "Urgente",
+    color: "text-red-700 dark:text-red-400",
+    bgColor: "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700",
+    icon: "🚨"
+  },
+  followup: {
+    label: "Seguimiento",
+    color: "text-orange-700 dark:text-orange-400",
+    bgColor: "bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700",
+    icon: "📋"
+  },
+  resolved: {
+    label: "Resuelto",
+    color: "text-gray-700 dark:text-gray-400",
+    bgColor: "bg-gray-100 dark:bg-gray-900/30 border-gray-300 dark:border-gray-700",
+    icon: "✅"
+  }
+};
+
 // ---------------- COMPONENT ----------------
 
 export default function OperatorChatPanel() {
@@ -102,6 +146,7 @@ export default function OperatorChatPanel() {
   const [suggestedResponses, setSuggestedResponses] = useState<CannedResponse[]>([]);
   const [messageSearchQuery, setMessageSearchQuery] = useState("");
   const [showMessageSearch, setShowMessageSearch] = useState(false);
+  const [selectedTagFilter, setSelectedTagFilter] = useState<ChatTag | "all">("all");
 
   const user = useAuthStore((state) => state.user);
   const notification = useNotification();
@@ -370,7 +415,14 @@ export default function OperatorChatPanel() {
         })
       );
 
-      setChats(chatsData);
+      // Load tags from localStorage
+      const chatTags = JSON.parse(localStorage.getItem('chatTags') || '{}');
+      const chatsWithTags = chatsData.map(chat => ({
+        ...chat,
+        tags: chatTags[chat.clientId] || []
+      }));
+
+      setChats(chatsWithTags);
       logger.log(`✅ Successfully loaded ${chatsData.length} chats from database`);
     } catch (err: any) {
       logger.error("❌ Error loading recent chats:", err);
@@ -551,9 +603,13 @@ export default function OperatorChatPanel() {
           return prev;
         }
 
+        // Load tags from localStorage for this chat
+        const chatTags = JSON.parse(localStorage.getItem('chatTags') || '{}');
+        const tags = chatTags[data.clientId] || [];
+
         const updated = [
           ...prev,
-          { ...data, messages: [], unread: 0, isClientTyping: false, isLoadingHistory: true },
+          { ...data, messages: [], unread: 0, isClientTyping: false, isLoadingHistory: true, tags },
         ];
 
         if (!activeClientIdRef.current && updated.length > 0) {
@@ -911,6 +967,40 @@ export default function OperatorChatPanel() {
     setShowMessageSearch(false); // Close message search when switching chats
     // Don't set unread to 0 here - let the useEffect handle it after DB update
     // This prevents phantom notifications if the DB update fails
+  };
+
+  // ---------------- TAG MANAGEMENT ----------------
+
+  const toggleChatTag = (clientId: string, tag: ChatTag) => {
+    setChats(prev => prev.map(chat => {
+      if (chat.clientId !== clientId) return chat;
+
+      const currentTags = chat.tags || [];
+      const hasTag = currentTags.includes(tag);
+
+      return {
+        ...chat,
+        tags: hasTag
+          ? currentTags.filter(t => t !== tag)
+          : [...currentTags, tag]
+      };
+    }));
+
+    // Persist to localStorage
+    const chatTags = JSON.parse(localStorage.getItem('chatTags') || '{}');
+    const currentTags = chatTags[clientId] || [];
+    const hasTag = currentTags.includes(tag);
+
+    if (hasTag) {
+      chatTags[clientId] = currentTags.filter((t: ChatTag) => t !== tag);
+    } else {
+      chatTags[clientId] = [...currentTags, tag];
+    }
+
+    localStorage.setItem('chatTags', JSON.stringify(chatTags));
+
+    const config = TAG_CONFIG[tag];
+    notification.success(hasTag ? `Etiqueta "${config.label}" removida` : `Etiqueta "${config.label}" agregada`);
   };
 
   const handleOpenCreateClientDialog = (username: string) => {
@@ -1354,6 +1444,32 @@ export default function OperatorChatPanel() {
                 >
                   {lastMessage}
                 </div>
+                {/* Tags */}
+                {c.tags && c.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1.5 flex-wrap">
+                    {c.tags.slice(0, 3).map(tag => {
+                      const config = TAG_CONFIG[tag];
+                      return (
+                        <span
+                          key={tag}
+                          className={`text-[9px] px-1.5 py-0.5 rounded border ${
+                            isActive
+                              ? "bg-white/20 text-white border-white/30"
+                              : `${config.bgColor} ${config.color}`
+                          }`}
+                          title={config.label}
+                        >
+                          {config.icon} {config.label}
+                        </span>
+                      );
+                    })}
+                    {c.tags.length > 3 && (
+                      <span className="text-[9px] text-neutral-500 dark:text-neutral-400">
+                        +{c.tags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {c.isClientTyping && (
                   <div
                     className={`mt-1 text-xs font-medium italic ${
@@ -1410,6 +1526,39 @@ export default function OperatorChatPanel() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {/* Tag selector dropdown */}
+                <div className="relative group">
+                  <button
+                    className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                    title="Gestionar etiquetas"
+                  >
+                    <span className="text-lg">🏷️</span>
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    <div className="p-2">
+                      <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 px-2 py-1 mb-1">
+                        Etiquetas
+                      </div>
+                      {(Object.keys(TAG_CONFIG) as ChatTag[]).map(tag => {
+                        const config = TAG_CONFIG[tag];
+                        const hasTag = activeChat.tags?.includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleChatTag(activeChat.clientId, tag)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors flex items-center gap-2"
+                          >
+                            <span className="text-base">{config.icon}</span>
+                            <span className="flex-1">{config.label}</span>
+                            {hasTag && <span className="text-primary">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Search button */}
                 <button
                   onClick={() => setShowMessageSearch(!showMessageSearch)}
