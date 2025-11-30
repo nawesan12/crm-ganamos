@@ -9,7 +9,7 @@ import { useNotification } from "@/lib/useNotification";
 import { soundManager } from "@/lib/sound-notifications";
 import { useNotificationSettings } from "@/stores/notification-settings-store";
 import { logger } from "@/lib/logger";
-import { cannedResponses, getCategories, type CannedResponse } from "@/lib/canned-responses";
+import { cannedResponses, getSuggestedResponses, type CannedResponse } from "@/lib/canned-responses";
 import {
   saveChatMessageAction,
   getChatHistoryAction,
@@ -99,6 +99,9 @@ export default function OperatorChatPanel() {
   const [cannedSearchQuery, setCannedSearchQuery] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [suggestedResponses, setSuggestedResponses] = useState<CannedResponse[]>([]);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
 
   const user = useAuthStore((state) => state.user);
   const notification = useNotification();
@@ -241,6 +244,19 @@ export default function OperatorChatPanel() {
         notification.info("Selector de emojis " + (showEmojiPicker ? "cerrado" : "abierto"));
       }
 
+      // Ctrl/Cmd + F: Open message search
+      if (modifier && e.key === 'f' && activeClientId) {
+        e.preventDefault();
+        setShowMessageSearch(prev => !prev);
+        if (!showMessageSearch) {
+          // Focus search input after state update
+          setTimeout(() => {
+            const searchInput = document.getElementById('message-search-input') as HTMLInputElement;
+            if (searchInput) searchInput.focus();
+          }, 100);
+        }
+      }
+
       // Ctrl/Cmd + Enter: Send message (if input has focus)
       if (modifier && e.key === 'Enter') {
         e.preventDefault();
@@ -264,20 +280,21 @@ export default function OperatorChatPanel() {
       if (modifier && e.key === '/') {
         e.preventDefault();
         notification.info(
-          "Atajos: Ctrl/Cmd+K (respuestas), Ctrl/Cmd+E (emojis), Ctrl/Cmd+Enter (enviar), Ctrl/Cmd+1-9 (cambiar chat), Esc (cerrar menús)"
+          "Atajos: Ctrl/Cmd+K (respuestas), Ctrl/Cmd+E (emojis), Ctrl/Cmd+F (buscar), Ctrl/Cmd+Enter (enviar), Ctrl/Cmd+1-9 (cambiar chat), Esc (cerrar menús)"
         );
       }
 
-      // Esc: Close quick replies menu and emoji picker
+      // Esc: Close quick replies menu, emoji picker, and message search
       if (e.key === 'Escape') {
         setShowCannedResponses(false);
         setShowEmojiPicker(false);
+        setShowMessageSearch(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [chats, input, showCannedResponses, showEmojiPicker, notification]);
+  }, [chats, input, showCannedResponses, showEmojiPicker, showMessageSearch, activeClientId, notification]);
 
   // ---------------- DATABASE HELPER FUNCTIONS ----------------
 
@@ -623,6 +640,15 @@ export default function OperatorChatPanel() {
         );
       }
 
+      // Smart auto-response suggestions (only for text messages from active chat)
+      if (data.type === "text" && data.message && activeClientIdRef.current === data.from) {
+        const suggestions = getSuggestedResponses(data.message);
+        if (suggestions.length > 0) {
+          setSuggestedResponses(suggestions);
+          logger.log("💡 Smart suggestions:", suggestions.map(s => s.label));
+        }
+      }
+
       if (!existingChat) {
         logger.warn("⚠️ Chat not found for incoming message:", {
           clientId: data.from,
@@ -880,6 +906,9 @@ export default function OperatorChatPanel() {
 
   const handleSelectChat = (clientId: string) => {
     setActiveClientId(clientId);
+    setSuggestedResponses([]); // Clear suggestions when switching chats
+    setMessageSearchQuery(""); // Clear message search when switching chats
+    setShowMessageSearch(false); // Close message search when switching chats
     // Don't set unread to 0 here - let the useEffect handle it after DB update
     // This prevents phantom notifications if the DB update fails
   };
@@ -1380,15 +1409,70 @@ export default function OperatorChatPanel() {
                   </div>
                 </div>
               </div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400 text-right hidden md:block">
-                <div>Total mensajes: {activeChat.messages.length}</div>
-                {activeChat.unread > 0 && (
-                  <div className="mt-1 text-red-500 font-medium">
-                    {activeChat.unread} sin leer
-                  </div>
-                )}
+              <div className="flex items-center gap-3">
+                {/* Search button */}
+                <button
+                  onClick={() => setShowMessageSearch(!showMessageSearch)}
+                  className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                  title="Buscar mensajes (Ctrl+F)"
+                >
+                  <Search className="h-5 w-5 text-neutral-600 dark:text-neutral-400" />
+                </button>
+
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 text-right hidden md:block">
+                  <div>Total mensajes: {activeChat.messages.length}</div>
+                  {activeChat.unread > 0 && (
+                    <div className="mt-1 text-red-500 font-medium">
+                      {activeChat.unread} sin leer
+                    </div>
+                  )}
+                </div>
               </div>
             </header>
+
+            {/* Message Search Bar */}
+            {showMessageSearch && (
+              <div className="bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 p-3">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                    <input
+                      id="message-search-input"
+                      type="text"
+                      placeholder="Buscar en esta conversación..."
+                      value={messageSearchQuery}
+                      onChange={(e) => setMessageSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2 text-sm border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    {messageSearchQuery && (
+                      <button
+                        onClick={() => setMessageSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {messageSearchQuery && (
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
+                      {activeChat.messages.filter(m =>
+                        m.text?.toLowerCase().includes(messageSearchQuery.toLowerCase())
+                      ).length} resultados
+                    </span>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowMessageSearch(false);
+                      setMessageSearchQuery("");
+                    }}
+                    className="p-2 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                    title="Cerrar búsqueda"
+                  >
+                    <X className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-neutral-100 dark:bg-neutral-900">
               {activeChat.isLoadingHistory && activeChat.messages.length === 0 && (
@@ -1398,7 +1482,15 @@ export default function OperatorChatPanel() {
                 </div>
               )}
 
-              {activeChat.messages.map((m, i) => {
+              {activeChat.messages
+                .filter(m => {
+                  // If search query is active, only show matching messages
+                  if (messageSearchQuery.trim()) {
+                    return m.text?.toLowerCase().includes(messageSearchQuery.toLowerCase());
+                  }
+                  return true;
+                })
+                .map((m, i) => {
                 const isOperator = m.from === "operator";
                 const isCurrentUser = m.operatorId === user?.id;
 
@@ -1449,7 +1541,24 @@ export default function OperatorChatPanel() {
                       )}
 
                       {/* Texto si hay */}
-                      {m.text && <div>{m.text}</div>}
+                      {m.text && (
+                        <div>
+                          {messageSearchQuery.trim() ? (
+                            // Highlight search term
+                            m.text.split(new RegExp(`(${messageSearchQuery})`, 'gi')).map((part, idx) =>
+                              part.toLowerCase() === messageSearchQuery.toLowerCase() ? (
+                                <mark key={idx} className="bg-yellow-300 dark:bg-yellow-600 text-neutral-900 dark:text-neutral-100 px-0.5 rounded">
+                                  {part}
+                                </mark>
+                              ) : (
+                                <span key={idx}>{part}</span>
+                              )
+                            )
+                          ) : (
+                            m.text
+                          )}
+                        </div>
+                      )}
 
                       {m.timestamp && (
                         <span
@@ -1511,6 +1620,46 @@ export default function OperatorChatPanel() {
 
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Smart Suggestions Banner */}
+            {suggestedResponses.length > 0 && (
+              <div className="border-t border-neutral-200 dark:border-neutral-700 bg-gradient-to-r from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                    💡 Respuestas sugeridas:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSuggestedResponses([])}
+                    className="ml-auto text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    title="Cerrar sugerencias"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedResponses.map((response, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setInput(response.message);
+                        setSuggestedResponses([]);
+                        notification.success(`Usando: ${response.label}`);
+                      }}
+                      className="px-3 py-2 bg-white dark:bg-neutral-800 border border-primary/30 dark:border-primary/50 rounded-lg text-sm hover:bg-primary/10 dark:hover:bg-primary/20 transition-all shadow-sm hover:shadow-md"
+                    >
+                      <div className="font-medium text-neutral-900 dark:text-neutral-100 mb-1">
+                        {response.label}
+                      </div>
+                      <div className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">
+                        {response.message.substring(0, 60)}...
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Input + botones */}
             <form
