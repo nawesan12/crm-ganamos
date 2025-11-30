@@ -28,36 +28,30 @@ export type SaveChatMessageInput = z.infer<typeof saveChatMessageSchema>;
 export async function saveChatMessageAction(input: SaveChatMessageInput) {
   const data = saveChatMessageSchema.parse(input);
 
-  // Auto-create client if guest data provided and no clientId
+  // Check if guest was manually converted to client
   let finalClientId = data.clientId;
   let finalGuestUsername = data.guestUsername;
   let finalGuestPhone = data.guestPhone;
 
+  // ONLY convert guest to client if guest already exists as a client
+  // (i.e., they were manually converted by an operator)
+  // DO NOT auto-create clients from guests
   if (!finalClientId && data.guestUsername) {
-    // Check if client already exists with this username
+    // Check if this guest was manually converted to a client
     const existingClient = await prisma.client.findUnique({
       where: { username: data.guestUsername },
     });
 
     if (existingClient) {
-      // Guest already converted to client
+      // Guest was manually converted - use client ID
       finalClientId = existingClient.id;
       // Clear guest fields since we have a proper client now
       finalGuestUsername = null;
       finalGuestPhone = null;
+      console.log(`✅ Guest "${data.guestUsername}" was converted to client #${finalClientId}`);
     } else {
-      // Create new client from guest data
-      const newClient = await prisma.client.create({
-        data: {
-          username: data.guestUsername,
-          phone: data.guestPhone ?? null,
-          status: "ACTIVE",
-        },
-      });
-      finalClientId = newClient.id;
-      // Clear guest fields since we have a proper client now
-      finalGuestUsername = null;
-      finalGuestPhone = null;
+      // Guest has not been converted yet - keep as guest
+      console.log(`💬 Saving message for guest "${data.guestUsername}"`);
     }
   }
 
